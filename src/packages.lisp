@@ -5,8 +5,10 @@
 
 (defpackage :ix-hll-kw
   (:export
+   :fun :struct
    :defun :defstruct
-   :int32))
+   :int32
+   :+))
 
 (defpackage :ix-hll-user
   (:use :ix-hll-kw))
