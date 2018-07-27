@@ -49,8 +49,8 @@
   ((ref :type hltype :initarg :ref :accessor typespec-volatile.ref)))
 
 (defclass typespec-function (typespec)
-  ((ret-type  :type typespec           :initarg ret-type  :accessor typespec-function.ret-type)
-   (arg-types :type (list-of typespec) :initarg arg-types :accessor typespec-function.arg-types)))
+  ((ret-type  :type typespec           :initarg :ret-type  :accessor typespec-function.ret-type)
+   (arg-types :type (list-of typespec) :initarg :arg-types :accessor typespec-function.arg-types)))
 
 (defclass decl ()
   ((name :type symbol :initarg :name :accessor decl.name)))
@@ -62,14 +62,17 @@
 (defclass decl-function (decl)
   ((ret-type :type typespec                    :initarg :ret-type :accessor decl-function.ret-type)
    (args     :type (list-of decl-function-arg) :initarg :args     :accessor decl-function.args)
-   (body     :type (list-of ast)               :initarg :ast      :accessor decl-function.ast)))
+   (body     :type (list-of gast)              :initarg :body     :accessor decl-function.body)))
 
 (defclass ast ()
   ((type :type typespec :accessor ast.type)))
 
+(deftype gast ()
+  '(or ast integer))
+
 (defclass ast-funcall (ast)
-  ((target :type ast           :initarg :expr :accessor ast-funcall.target)
-   (args   :type (list-of ast) :initarg :args :accessor ast-funcall.args)))
+  ((target :type gast           :initarg :expr :accessor ast-funcall.target)
+   (args   :type (list-of gast) :initarg :args :accessor ast-funcall.args)))
 
 (defclass decl-variable (decl)
   ((type     :type typespec :initarg :type    :accessor decl-variable.type)
@@ -126,11 +129,11 @@
 ;;; hll operators
 
 (defclass ast-binop (ast)
-  ((left  :type ast    :initarg :left  :accessor ast-binop.left)
-   (right :type ast    :initarg :right :accessor ast-binop.right)
+  ((left  :type gast   :initarg :left  :accessor ast-binop.left)
+   (right :type gast   :initarg :right :accessor ast-binop.right)
    (opstr :type string :initarg :opstr :accessor ast-binop.opstr)))
 
-(defmacro define-binary-operator-with-left-nary-syntax (opstr binop-fn-name binop-class-name nary-fn-name)
+(defmacro define-binary-operator-with-nary-syntax (opstr assoc binop-fn-name binop-class-name nary-fn-name)
   `(progn
      (defclass ,binop-class-name (ast-binop)
        ((opstr :initform ,opstr)))
@@ -142,11 +145,14 @@
 
      (defun ,nary-fn-name (a b &rest args)
        (if args
-           (,binop-fn-name a (apply #',nary-fn-name (cons b args)))
+           ,(ecase assoc
+              (:left
+               `(apply #',nary-fn-name (cons (,binop-fn-name a b) args)))
+              (:right
+               `(,binop-fn-name a (apply #',nary-fn-name (cons b args)))))
            (,binop-fn-name a b)))))
 
-(define-binary-operator-with-left-nary-syntax
-    "+" binop-+ ast-binop-+ ix-hll-kw:+)
+(define-binary-operator-with-nary-syntax "+" :left binop-+ ast-binop-+ ix-hll-kw:+)
 
 ;;; hll struct definition
 
@@ -177,6 +183,13 @@
 
 ;;; hll function definition
 
+(defun make-defun-arg-types (args)
+  (loop for arg in args collect
+       (match arg
+         ((list name type)
+          `(make-decl-function-arg :name ,name :type ,type))
+         (_ (error "Invalid argument specification in function definition" )))))
+
 (defmacro ix-hll-kw:fun (ret-type args &body body)
   `(make-instance 'decl-function
                   :name (gensym "FN")
@@ -186,18 +199,23 @@
 
 (defmacro ix-hll-kw:defun (name ret-type args &body body)
   (let ((rest% (gensym))
-        (fn% (gensym)))
+        (fn% (gensym))
+        (ret-type% (gensym)))
     `(progn
        (defvar ,name nil)
 
        (when ,name
          (error "Defining function ~a: name already defined" ',name))
 
-       (let ((,fn% (ix-hll-kw:fun ,ret-type ,args ,@body)))
+       (let* ((,ret-type% ,ret-type)
+              (,fn% (ix-hll-kw:fun ,ret-type% ,args ,@body)))
          (setf (decl.name ,fn%) ',name)
          (push ,fn% (state.functions *state*))
          (setf ,name (make-instance 'ast-func-ref
-                                    :name ',name
+                                    :type (make-instance 'typespec-function
+                                                         :ret-type ,ret-type%
+                                                         :arg-types (mapcar #'decl-function-arg.type
+                                                                            (decl-function.args ,fn%)))
                                     :func (car (state.functions *state*)))))
 
        (defun ,name (&rest ,rest%)
@@ -210,3 +228,6 @@
        (format t "hi ~a~%" arg)
        (let ((*package* (find-package 'ix-hll-user)))
          (load arg))))
+
+(loop for func in (nreverse (state.functions *state))
+     emit functions here)
