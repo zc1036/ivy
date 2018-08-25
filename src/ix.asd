@@ -14,4 +14,6 @@
   :serial t
   :depends-on (:optima)
   :components ((:file "packages")
+               (:file "ix-util")
+               (:file "ix-il")
                (:file "ix-hll")))

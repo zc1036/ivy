@@ -5,10 +5,13 @@
 
 (defpackage :ix-il
   (:use :cl)
-  (:export :r :i :move))
+  (:export :r :i :optr :optr.repr
+           :move :ext :add :sub
+           :reg.name :reg.bytesize :imm.value :imm.bytesize
+           :with-reg))
 
 (defpackage :ix-hll
-  (:use :cl :optima :ix-il)
+  (:use :cl :optima :ix-il :ix-util)
   (:export :main))
 
 (defpackage :ix-hll-kw
@@ -16,7 +19,7 @@
    :fun :struct
    :defun :defstruct
    :int32
-   :+ :-
+   :+ :- :=
    :let))
 
 (defpackage :ix-hll-user

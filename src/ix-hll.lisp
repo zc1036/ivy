@@ -74,8 +74,8 @@
 (deftype gast ()
   '(or ast integer))
 
-(defgeneric gast.emit (gast)
-  "Converts the given gast to IL")
+;; Converts the given gast to IL
+(defgeneric gast.emit (gast))
 
 (defclass ast-funcall (ast)
   ((target :type gast           :initarg :expr :accessor ast-funcall.target)
@@ -95,9 +95,10 @@
    (type :type typespec      :initarg :type :accessor ast.type)))
 
 (defclass ast-binop (ast)
-  ((left  :type gast   :initarg :left  :accessor ast-binop.left)
-   (right :type gast   :initarg :right :accessor ast-binop.right)
-   (opstr :type string :initarg :opstr :accessor ast-binop.opstr)))
+  ((left  :type gast     :initarg :left  :accessor ast-binop.left)
+   (right :type gast     :initarg :right :accessor ast-binop.right)
+   (opstr :type string   :initarg :opstr :accessor ast-binop.opstr)
+   (type  :type typespec :initarg :type)))
 
 ;;; the global hll compiler state
 
@@ -117,6 +118,16 @@
 
 ;;; type-related functions
 
+(defgeneric gast.type (gast))
+
+(defmethod gast.type ((a ast))
+  (ast.type a))
+
+(defmethod gast.type ((a integer))
+  (declare (special ix-hll-kw:int32))
+  
+  ix-hll-kw:int32)
+
 (defgeneric remove-cv (typespec))
 
 (defmethod remove-cv ((x typespec-const))
@@ -129,10 +140,14 @@
   x)
 
 (defun is-numeric (x)
-  (hlt-builtin.numeric x))
+  (ematch x
+    ((class typespec-atom (ref (class hlt-builtin numeric)))
+     numeric)
+    ((class typespec)
+     nil)))
 
 (defun typespec-equalp (a b)
-  (match (list a b)
+  (ematch (list a b)
     ((list (class typespec-const (ref aref)) (class typespec-const (ref bref)))
      (typespec-equalp aref bref))
     ((list (class typespec-volatile (ref aref)) (class typespec-volatile (ref bref)))
@@ -144,9 +159,10 @@
      (and (typespec-equalp a-ret b-ret)
           (= (length a-args) (length b-args))
           (every #'typespec-equalp a-args b-args)))
-    ((list (class typespec-atom (ref aref)) (class typespec-pointer (ref bref)))
+    ((list (class typespec-atom (ref aref)) (class typespec-atom (ref bref)))
      (eq aref bref))
-    (_ nil)))
+    ((list (class typespec) (class typespec))
+     nil)))
 
 ;;(defgeneric typespec-equalp (a b))
 ;;
@@ -183,28 +199,14 @@
     (ast-binop-= t)
     (ast-var-ref t)))
 
-;;; gast.emit methods
-
-(defmethod gast.emit ((a integer))
-  (let* ((imm (i a))
-         (reg (r (imm.bytesize imm))))
-    (list reg (move reg imm))))
-
-(defmethod gast.emit ((a ast-binop-+))
-  resume here, handle signed and unsigned, handle different register sizes
-  (with-slots (left right) a
-    (let+ (((left-res left-il)   (gast.emit left))
-           ((right-res right-il) (gast.emit right))
-           (reg (r (max ))))
-      (list (list left-il right-il (add (r)))))))
-
 ;;; hll global names
 
 (defvar hlts-int32 (make-instance 'hlt-builtin
                                   :signed-p t
                                   :float-p nil
                                   :bytesize 4
-                                  :name :int32))
+                                  :name :int32
+                                  :numeric t))
 
 (defvar ix-hll-kw:int32 (make-instance 'typespec-atom :ref hlts-int32))
 
@@ -226,14 +228,18 @@
        ((opstr :initform ,opstr)))
 
      (defun ,binop-fn-name (a b)
-       (unless (and (is-numeric (remove-cv a)) (is-numeric (remove-cv b)))
-         (error "Applying binary operator ~a to expressions of non-numeric type" ,opstr))
-       (unless (typespec-equalp (remove-cv a) (remove-cv b))
-         (error "Applying binary operator ~a to expressions of different types" ,opstr))
-       (make-instance ',binop-class-name
-                      :type (remove-cv (ast.type a))
-                      :left a
-                      :right b))
+       (let* ((a-type (gast.type a))
+              (b-type (gast.type b))
+              (a-type-nocv (remove-cv a-type))
+              (b-type-nocv (remove-cv b-type)))
+         (unless (and (is-numeric a-type-nocv) (is-numeric b-type-nocv))
+           (error "Applying binary operator ~a to expressions of non-numeric type" ,opstr))
+         (unless (typespec-equalp a-type-nocv b-type-nocv)
+           (error "Applying binary operator ~a to expressions of different types" ,opstr))
+         (make-instance ',binop-class-name
+                        :type a-type-nocv
+                        :left a
+                        :right b)))
 
      (define-nary-syntax-by-binary ,nary-fn-name ,binop-fn-name ,assoc)))
 
@@ -256,6 +262,34 @@
                  :right b))
 
 (define-nary-syntax-by-binary ix-hll-kw:= binop-= :right)
+
+;;; gast.emit helpers
+
+(defun reg-extend (a b)
+  "Returns a list ((areg ainstrs) (breg binstrs))"
+  (let ((regsize (max (reg.bytesize a) (reg.bytesize b))))
+    (list
+     (if (= (reg.bytesize a) regsize)
+         (list a nil)
+         (with-reg newreg regsize (ext newreg a)))
+     (if (= (reg.bytesize b) regsize)
+         (list b nil)
+         (with-reg newreg regsize (ext newreg b))))))
+
+;;; gast.emit methods
+
+(defmethod gast.emit ((a integer))
+  (let* ((imm (i a))
+         (reg (r (imm.bytesize imm))))
+    (list reg (move reg imm))))
+
+(defmethod gast.emit ((a ast-binop-+))
+  (with-slots (left right) a
+    (let+ (((left-res left-il)              (gast.emit left))
+           ((right-res right-il)            (gast.emit right))
+           (((areg ainstrs) (breg binstrs)) (reg-extend left-res right-res)))
+      (with-reg resreg areg
+        (list left-il right-il ainstrs binstrs (add resreg areg breg))))))
 
 ;;; hll struct definition
 
@@ -285,20 +319,20 @@
      (when ,name
        (error "Defining structure ~a: name already defined" ',name))
      (setf ,name (ix-hll-kw:struct ,@body))
-     (setf (hlt-structure.name ,name) ',name)))
+     (setf (hltype.name ,name) ',name)))
 
 ;;; LET form
 
 (defun make-let-bindings (bindings)
-  (let ((bindings-and-inits)
-        (loop for binding in bindings collect
+  (let ((bindings-and-inits
+         (loop for binding in bindings collect
              (destructuring-bind (name type &optional init) binding
                (list `(make-instance 'decl-variable
                                      :name ',name
                                      :type ,type
                                      :storage :local)
                      (if init
-                         `(make-instance ))))))
+                         `(make-instance )))))))
     (values (mapcar #'car  bindings-and-inits)
             (mapcar #'cadr bindings-and-inits))))
 
@@ -350,13 +384,24 @@
                         :target ,name
                         :args ,rest%)))))
 
-0;;; main program
+;;; main program
+
+(defun print-instrs (instrs)
+  (etypecase instrs
+    (list (mapc #'print-instrs instrs))
+    (optr (format t "~a~%" (optr.repr instrs)))))
 
 (defun main (argv)
   (loop for arg in (cdr argv) do
-       (format t "hi ~a~%" arg)
+       (format t "Compiling ~a~%~%" arg)
        (let ((*package* (find-package 'ix-hll-user)))
          (load arg)))
 
   (loop for func in (state.functions *state*) do
-       (format t "breh ~a~%~%" func)))
+       (format t "Function ~a:~%" (decl.name func))
+
+       (loop for elem in (decl-function.body func) do
+            (let+ (((result ops) (gast.emit elem)))
+              result
+              (print-instrs ops)
+              (format t ";;~%")))))
