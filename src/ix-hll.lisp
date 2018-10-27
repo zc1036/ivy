@@ -87,8 +87,7 @@
    (storage  :type symbol   :initarg :storage :accessor decl-variable.storage)))
 
 (defclass ast-var-ref (ast)
-  ((var  :type decl-variable :initarg :var  :accessor ast-var-ref.var)
-   (type :type typespec      :initarg :type :accessor ast.type)))
+  ((var :type decl-variable :initarg :var :accessor ast-var-ref.var)))
 
 (defclass ast-func-ref (ast)
   ((func :type decl-function :initarg :func :accessor ast-func-ref.func)
@@ -99,8 +98,21 @@
    (right :type gast     :initarg :right :accessor ast-binop.right)
    (opstr :type string   :initarg :opstr :accessor ast-binop.opstr)
    (type  :type typespec :initarg :type)))
+ 
+(defstruct (ast-let-binding (:conc-name ast-let-binding.))
+  (name nil :type symbol)
+  (type nil :type typespec)
+  (init nil :type (or null gast)))
+
+(defclass ast-let (ast)
+  ((bindings :type (list-of ast-let-binding) :initarg :bindings :accessor ast-let.bindings)
+   (body     :type (list-of gast)            :initarg :body     :accessor ast-let.body)))
 
 ;;; the global hll compiler state
+
+(defstruct (lexical-scope (:conc-name lexical-scope.))
+  (names nil :type list)
+  (next  nil :type (or lexical-scope null)))
 
 (defstruct (state (:conc-name state.))
   (functions nil :type (list-of decl-function)))
@@ -115,6 +127,9 @@
       ((class typespec-function ret-type)
        ret-type)
       (_ (error "Cannot determine type for function call")))))
+
+(defmethod ast.type ((x ast-var-ref))
+  (decl-variable.type (ast-var-ref.var x)))
 
 ;;; type-related functions
 
@@ -267,29 +282,43 @@
 
 (defun reg-extend (a b)
   "Returns a list ((areg ainstrs) (breg binstrs))"
-  (let ((regsize (max (reg.bytesize a) (reg.bytesize b))))
+  (let ((regsize (max (ix-il:reg.bytesize a) (ix-il:reg.bytesize b))))
     (list
-     (if (= (reg.bytesize a) regsize)
+     (if (= (ix-il:reg.bytesize a) regsize)
          (list a nil)
-         (with-reg newreg regsize (ext newreg a)))
-     (if (= (reg.bytesize b) regsize)
+         (ix-il:with-reg newreg regsize (ix-il:ext newreg a)))
+     (if (= (ix-il:reg.bytesize b) regsize)
          (list b nil)
-         (with-reg newreg regsize (ext newreg b))))))
+         (ix-il:with-reg newreg regsize (ix-il:ext newreg b))))))
 
 ;;; gast.emit methods
 
 (defmethod gast.emit ((a integer))
-  (let* ((imm (i a))
-         (reg (r (imm.bytesize imm))))
-    (list reg (move reg imm))))
+  (let* ((imm (ix-il:i a))
+         (reg (ix-il:r (ix-il:imm.bytesize imm))))
+    (list reg (ix-il:move reg imm))))
 
 (defmethod gast.emit ((a ast-binop-+))
   (with-slots (left right) a
     (let+ (((left-res left-il)              (gast.emit left))
            ((right-res right-il)            (gast.emit right))
            (((areg ainstrs) (breg binstrs)) (reg-extend left-res right-res)))
-      (with-reg resreg areg
-        (list left-il right-il ainstrs binstrs (add resreg areg breg))))))
+      (ix-il:with-reg resreg areg
+        (list left-il right-il ainstrs binstrs (ix-il:add resreg areg breg))))))
+
+(defmethod gast.emit ((a ast-binop--))
+  (with-slots (left right) a
+    (let+ (((left-res left-il)              (gast.emit left))
+           ((right-res right-il)            (gast.emit right))
+           (((areg ainstrs) (breg binstrs)) (reg-extend left-res right-res)))
+      (ix-il:with-reg resreg areg
+        (list left-il right-il ainstrs binstrs (ix-il:sub resreg areg breg))))))
+
+(defmethod gast.emit ((a ast-var-ref))
+  (let ((var (ast-var-ref.var a)))
+    )
+  ;; resume here, mapping decl-variables to IL registers
+  )
 
 ;;; hll struct definition
 
@@ -323,24 +352,38 @@
 
 ;;; LET form
 
-(defun make-let-bindings (bindings)
+(defun make-let-bindings (names types% inits%)
   (let ((bindings-and-inits
-         (loop for binding in bindings collect
-             (destructuring-bind (name type &optional init) binding
-               (list `(make-instance 'decl-variable
-                                     :name ',name
-                                     :type ,type
-                                     :storage :local)
-                     (if init
-                         `(make-instance )))))))
+         (loop for name in names for i from 0 collect
+              (list
+               `(make-ast-let-binding :name ',name
+                                      :type (nth ,i ,types%)
+                                      :init (nth ,i ,inits%))
+               `(,name
+                 (make-instance 'ast-var-ref
+                                :var (make-instance 'decl-variable
+                                                    :name ',name
+                                                    :type (nth ,i ,types%)
+                                                    :storage :local)))
+               `(when (nth ,i ,inits%)
+                  (binop-= ,name (nth ,i ,inits%)))))))
     (values (mapcar #'car  bindings-and-inits)
-            (mapcar #'cadr bindings-and-inits))))
+            (mapcar #'cadr bindings-and-inits)
+            (mapcar #'caddr bindings-and-inits))))
 
 (defmacro ix-hll-kw:let (bindings &body body)
-  (multiple-value-bind (let-bindings initializers) (make-let-bindings bindings)
-    `(let ,let-bindings
-       ,@initializers
-       ,@body)))
+  (let ((types% (gensym "TYPES"))
+        (inits% (gensym "INITS"))
+        (names (mapcar #'car bindings)))
+    `(let ((,types% (list ,@(mapcar #'cadr bindings)))
+           (,inits% (list ,@(mapcar #'caddr bindings))))
+       ,(multiple-value-bind (bindings let-bindings initializers) (make-let-bindings names types% inits%)
+          `(make-instance 'ast-let
+                          :bindings (list ,@bindings)
+                          :body (let ,let-bindings
+                                  (list
+                                   ,@initializers
+                                   ,@body)))))))
 
 ;;; hll function definition
 
@@ -348,15 +391,21 @@
   (loop for arg in args collect
        (match arg
          ((list name type)
-          `(make-decl-function-arg :name ,name :type ,type))
-         (_ (error "Invalid argument specification in function definition" )))))
+          `(make-decl-function-arg :name ',name :type ,type))
+         (_ (error "Invalid argument specification in function definition")))))
+
+(defun make-defun-arg-bindings (args)
+  (multiple-value-bind (let-bindings initializers) (make-let-bindings args)
+    (declare (ignore initializers))
+    let-bindings))
 
 (defmacro ix-hll-kw:fun (ret-type args &body body)
   `(make-instance 'decl-function
                   :name (gensym "FN")
                   :ret-type ,ret-type
                   :args (list ,@(make-defun-arg-types args))
-                  :body (list ,@body)))
+                  :body (let ,(make-defun-arg-bindings args)
+                          (list ,@body))))
 
 (defmacro ix-hll-kw:defun (name ret-type args &body body)
   (let ((rest% (gensym))
@@ -389,7 +438,7 @@
 (defun print-instrs (instrs)
   (etypecase instrs
     (list (mapc #'print-instrs instrs))
-    (optr (format t "~a~%" (optr.repr instrs)))))
+    (ix-il:optr (format t "  ~a~%" (ix-il:optr.repr instrs)))))
 
 (defun main (argv)
   (loop for arg in (cdr argv) do
@@ -404,4 +453,4 @@
             (let+ (((result ops) (gast.emit elem)))
               result
               (print-instrs ops)
-              (format t ";;~%")))))
+              (format t " ;;~%")))))

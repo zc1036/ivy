@@ -11,7 +11,7 @@
            :with-reg))
 
 (defpackage :ix-hll
-  (:use :cl :optima :ix-il :ix-util)
+  (:use :cl :optima :ix-util)
   (:export :main))
 
 (defpackage :ix-hll-kw

@@ -12,3 +12,19 @@
 
 (defmacro let+ (bindings &body body)
   (make-let+-binding bindings body))
+
+;; (defun make-defunt-arg-list (typed-lambda-list)
+;;   (when typed-lambda-list
+;;     (car
+;;      (ecase (car typed-lambda-list)
+;;        (&optional (car '&optional (make-defunt-arg-list (cdr typed-lambda-list))))
+;;        (&rest     (car '&rest     (make-defunt-arg-list (cdr typed-lambda-list))))
+;;        (&key      (car '&key      (make-defunt-arg-list (cdr typed-lambda-list))))
+;;        (&allow-other-keys (car '&rest     (make-defunt-arg-list (cdr typed-lambda-list))))
+;;        (otherwise
+;;         (ematch (car typed-lambda-list)
+;;           ()))))))
+;; 
+;; (defmacro defunt (name typed-lambda-list)
+;;   `(defun ,name ))
+;; 
