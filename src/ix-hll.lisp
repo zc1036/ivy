@@ -281,7 +281,9 @@
 ;;; gast.emit helpers
 
 (defun reg-extend (a b)
-  "Returns a list ((areg ainstrs) (breg binstrs))"
+  "Emits necessary EXT instructions to extend register A to the size of B or
+   vice versa, whichever creates a larger register. 
+   Returns a list ((areg ainstrs) (breg binstrs))"
   (let ((regsize (max (ix-il:reg.bytesize a) (ix-il:reg.bytesize b))))
     (list
      (if (= (ix-il:reg.bytesize a) regsize)
@@ -313,6 +315,14 @@
            (((areg ainstrs) (breg binstrs)) (reg-extend left-res right-res)))
       (ix-il:with-reg resreg areg
         (list left-il right-il ainstrs binstrs (ix-il:sub resreg areg breg))))))
+
+(defmethod gast.emit ((a ast-let-binding))
+  (with-slots (bindings body) a
+    (let ((body-emissions (mapcar #'gast.emit body)))
+      ;; LET forms evaluate to the last expression in their body
+      ;; the rest of the result registers are discarded
+      (list (caar (last body-emissions))
+            (mapcar #'second body-emissions)))))
 
 (defmethod gast.emit ((a ast-var-ref))
   (let ((var (ast-var-ref.var a)))
@@ -367,9 +377,9 @@
                                                     :storage :local)))
                `(when (nth ,i ,inits%)
                   (binop-= ,name (nth ,i ,inits%)))))))
-    (values (mapcar #'car  bindings-and-inits)
-            (mapcar #'cadr bindings-and-inits)
-            (mapcar #'caddr bindings-and-inits))))
+    (values (mapcar #'first  bindings-and-inits)
+            (mapcar #'second bindings-and-inits)
+            (mapcar #'third  bindings-and-inits))))
 
 (defmacro ix-hll-kw:let (bindings &body body)
   (let ((types% (gensym "TYPES"))
@@ -382,7 +392,6 @@
                           :bindings (list ,@bindings)
                           :body (let ,let-bindings
                                   (list
-                                   ,@initializers
                                    ,@body)))))))
 
 ;;; hll function definition
