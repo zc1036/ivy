@@ -59,14 +59,15 @@
 (defclass decl ()
   ((name :type symbol :initarg :name :accessor decl.name)))
 
-(defstruct (decl-function-arg (:conc-name decl-function-arg.))
+(defstruct (decl-var-binding (:conc-name decl-var-binding.))
   (name nil :type symbol)
-  (type nil :type typespec))
+  (type nil :type typespec)
+  (init nil :type (or null gast)))
 
 (defclass decl-function (decl)
-  ((ret-type :type typespec                    :initarg :ret-type :accessor decl-function.ret-type)
-   (args     :type (list-of decl-function-arg) :initarg :args     :accessor decl-function.args)
-   (body     :type (list-of gast)              :initarg :body     :accessor decl-function.body)))
+  ((ret-type :type typespec                   :initarg :ret-type :accessor decl-function.ret-type)
+   (args     :type (list-of decl-var-binding) :initarg :args     :accessor decl-function.args)
+   (body     :type (list-of gast)             :initarg :body     :accessor decl-function.body)))
 
 (defclass ast ()
   ((type :type typespec :accessor ast.type)))
@@ -99,14 +100,9 @@
    (opstr :type string   :initarg :opstr :accessor ast-binop.opstr)
    (type  :type typespec :initarg :type)))
  
-(defstruct (ast-let-binding (:conc-name ast-let-binding.))
-  (name nil :type symbol)
-  (type nil :type typespec)
-  (init nil :type (or null gast)))
-
 (defclass ast-let (ast)
-  ((bindings :type (list-of ast-let-binding) :initarg :bindings :accessor ast-let.bindings)
-   (body     :type (list-of gast)            :initarg :body     :accessor ast-let.body)))
+  ((bindings :type (list-of decl-var-binding) :initarg :bindings :accessor ast-let.bindings)
+   (body     :type (list-of gast)             :initarg :body     :accessor ast-let.body)))
 
 ;;; the global hll compiler state
 
@@ -295,6 +291,10 @@
 
 ;;; gast.emit methods
 
+(defmethod gast.emit ((a null))
+  ;; nothing
+  (list () ()))
+
 (defmethod gast.emit ((a integer))
   (let* ((imm (ix-il:i a))
          (reg (ix-il:r (ix-il:imm.bytesize imm))))
@@ -316,7 +316,7 @@
       (ix-il:with-reg resreg areg
         (list left-il right-il ainstrs binstrs (ix-il:sub resreg areg breg))))))
 
-(defmethod gast.emit ((a ast-let-binding))
+(defmethod gast.emit ((a ast-let))
   (with-slots (bindings body) a
     (let ((body-emissions (mapcar #'gast.emit body)))
       ;; LET forms evaluate to the last expression in their body
@@ -366,9 +366,9 @@
   (let ((bindings-and-inits
          (loop for name in names for i from 0 collect
               (list
-               `(make-ast-let-binding :name ',name
-                                      :type (nth ,i ,types%)
-                                      :init (nth ,i ,inits%))
+               `(make-decl-var-binding :name ',name
+                                       :type (nth ,i ,types%)
+                                       :init (nth ,i ,inits%))
                `(,name
                  (make-instance 'ast-var-ref
                                 :var (make-instance 'decl-variable
@@ -381,40 +381,37 @@
             (mapcar #'second bindings-and-inits)
             (mapcar #'third  bindings-and-inits))))
 
-(defmacro ix-hll-kw:let (bindings &body body)
+(defmacro ix-hll-kw:let (args &body body)
   (let ((types% (gensym "TYPES"))
         (inits% (gensym "INITS"))
-        (names (mapcar #'car bindings)))
-    `(let ((,types% (list ,@(mapcar #'cadr bindings)))
-           (,inits% (list ,@(mapcar #'caddr bindings))))
+        (names (mapcar #'car args)))
+    `(let ((,types% (list ,@(mapcar #'cadr args)))
+           (,inits% (list ,@(mapcar #'caddr args))))
        ,(multiple-value-bind (bindings let-bindings initializers) (make-let-bindings names types% inits%)
           `(make-instance 'ast-let
                           :bindings (list ,@bindings)
                           :body (let ,let-bindings
                                   (list
+                                   ,@initializers
                                    ,@body)))))))
 
 ;;; hll function definition
 
-(defun make-defun-arg-types (args)
-  (loop for arg in args collect
-       (match arg
-         ((list name type)
-          `(make-decl-function-arg :name ',name :type ,type))
-         (_ (error "Invalid argument specification in function definition")))))
-
-(defun make-defun-arg-bindings (args)
-  (multiple-value-bind (let-bindings initializers) (make-let-bindings args)
-    (declare (ignore initializers))
-    let-bindings))
-
 (defmacro ix-hll-kw:fun (ret-type args &body body)
-  `(make-instance 'decl-function
-                  :name (gensym "FN")
-                  :ret-type ,ret-type
-                  :args (list ,@(make-defun-arg-types args))
-                  :body (let ,(make-defun-arg-bindings args)
-                          (list ,@body))))
+  (let ((types% (gensym "TYPES"))
+        (inits% (gensym "INITS"))
+        (names (mapcar #'car args)))
+    `(let ((,types% (list ,@(mapcar #'cadr args)))
+           (,inits% (list ,@(mapcar #'caddr args))))
+       ,(multiple-value-bind (bindings let-bindings initializers) (make-let-bindings names types% inits%)
+          `(make-instance 'decl-function
+                          :name (gensym "FN")
+                          :ret-type ,ret-type
+                          :args (list ,@bindings)
+                          :body (let ,let-bindings
+                                  (list
+                                   ,@initializers
+                                   ,@body)))))))
 
 (defmacro ix-hll-kw:defun (name ret-type args &body body)
   (let ((rest% (gensym))
@@ -433,7 +430,7 @@
          (setf ,name (make-instance 'ast-func-ref
                                     :type (make-instance 'typespec-function
                                                          :ret-type ,ret-type%
-                                                         :arg-types (mapcar #'decl-function-arg.type
+                                                         :arg-types (mapcar #'decl-var-binding.type
                                                                             (decl-function.args ,fn%)))
                                     :func (car (state.functions *state*)))))
 
