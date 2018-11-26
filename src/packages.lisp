@@ -10,8 +10,12 @@
            :reg.name :reg.bytesize :imm.value :imm.bytesize
            :with-reg))
 
+(defpackage :ix-arch
+  (:use :cl)
+  (:export :arch :arch.bits :make-arch))
+
 (defpackage :ix-hll
-  (:use :cl :optima :ix-util)
+  (:use :cl :optima :ix-util :ix-arch)
   (:export :main))
 
 (defpackage :ix-hll-kw

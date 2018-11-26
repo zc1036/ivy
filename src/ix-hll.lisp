@@ -52,6 +52,10 @@
 (defclass typespec-pointer (typespec)
   ((ref :type hltype :initarg :ref :accessor typespec-pointer.ref)))
 
+(defclass typespec-array (typespec)
+  ((elt-type :type typespec          :initarg :elt-type :accessor typespec-array.elt-type)
+   (size     :type (or null integer) :initarg :size     :accessor typespec-array.size)))
+
 (defclass typespec-function (typespec)
   ((ret-type  :type typespec           :initarg :ret-type  :accessor typespec-function.ret-type)
    (arg-types :type (list-of typespec) :initarg :arg-types :accessor typespec-function.arg-types)))
@@ -107,13 +111,117 @@
 ;;; the global hll compiler state
 
 (defstruct (lexical-scope (:conc-name lexical-scope.))
-  (names nil :type list)
-  (next  nil :type (or lexical-scope null)))
+  (bindings nil :type list) ;; alist map of decl-variables to ix-il:regs
+  (next     nil :type (or lexical-scope null)))
 
 (defstruct (state (:conc-name state.))
-  (functions nil :type (list-of decl-function)))
+  (functions nil :type (list-of decl-function))
+  (lex-vars  nil :type lexical-scope)
+  (glob-vars nil :type list)) ;; alist of decl-variables to ix-il:regs
 
 (defparameter *state* (make-state))
+(defparameter *target-arch* (make-arch :name "x86-64"
+                                       :bits 64))
+
+(defun lexical-scope.lookup (scope var)
+  (when scope
+    (let ((binding (assoc var (lexical-scope.bindings scope))))
+      (if binding
+          (cdr binding)
+          (lexical-scope.lookup (lexical-scope.next scope) var)))))
+
+(defun state.lookup-var (state var)
+  (lexical-scope.lookup (state.lex-vars state) var))
+
+;;; typespec.alignof functions
+
+(defgeneric typespec.alignof (typespec))
+
+(defmethod typespec.alignof ((a typespec-atom))
+  (hltype.alignof (typespec-atom.ref a)))
+
+(defmethod typespec.alignof ((a typespec-const))
+  (hltype.alignof (typespec-const.ref a)))
+
+(defmethod typespec.alignof ((a typespec-volatile))
+  (hltype.alignof (typespec-volatile.ref a)))
+
+(defmethod typespec.alignof ((a typespec-pointer))
+  (/ (arch.bits *target-arch*) 8))
+
+(defmethod typespec.alignof ((a typespec-array))
+  (typespec.alignof (typespec-array.elt-type a)))
+
+(defmethod typespec.alignof ((a typespec-function))
+  (error "Cannot evaluate alignment of function"))
+
+;;; hltype.alignof functions
+
+(defgeneric hltype.alignof (hltype))
+
+(defmethod hltype.alignof ((a hltype-builtin))
+  (hltype.sizeof a))
+
+(defmethod hltype.alignof ((a hltype-structure))
+  (max (mapcar #'typespec.alignof (mapcar #'hlt-agg-member.type (hltype-structure.members a)))))
+
+(defmethod hltype.alignof ((a hltype-union))
+  (max (mapcar #'typespec.alignof (mapcar #'hlt-agg-member.type (hltype-union.members a)))))
+
+;;; typespec.sizeof functions
+
+(defgeneric typespec.sizeof (typespec))
+
+(defmethod typespec.sizeof ((a typespec-atom))
+  (hltype.sizeof (typespec-atom.ref a)))
+
+(defmethod typespec.sizeof ((a typespec-const))
+  (hltype.sizeof (typespec-const.ref a)))
+
+(defmethod typespec.sizeof ((a typespec-volatile))
+  (hltype.sizeof (typespec-volatile.ref a)))
+
+(defmethod typespec.sizeof ((a typespec-pointer))
+  (/ (arch.bits *target-arch*) 8))
+
+(defmethod typespec.sizeof ((a typespec-array))
+  (with-slots (size elt-type) a
+    (unless size
+      (error "Cannot evaluate size of an unsized array"))
+    (* size (typespec.sizeof elt-type))))
+
+(defmethod typespec.sizeof ((a typespec-function))
+  (error "Cannot evaluate size of function"))
+
+;;; hltype.sizeof functions
+
+(defun round-up-to-nearest (x round-to)
+  (floor (* (/ (+ (1- round-to) x) round-to) round-to)))
+
+(defun agg-member-type-size-offset-align (members)
+  (let ((sum 0)
+        (mbr-types (mapcar #'hlt-agg-member.type members))
+        (mbr-sizes (mapcar #'typespec.sizeof mbr-types))
+        (mbr-aligns (mapcar #'typespec.alignof mbr-types)))
+    (loop
+       for type in types
+       for size in mbr-sizes
+       for align in mbr-aligns
+       collect
+         (let ((offset (round-up-to-nearest sum align)))
+           (setf sum (+ offset size))
+           (list type size offset align)))))
+
+(defgeneric hltype.sizeof (hltype))
+
+(defmethod hltype.sizeof ((a hlt-builtin))
+  (hlt-builtin.bytesize a))
+
+(defmethod hltype.sizeof ((a hlt-structure))
+  (let+ ((member-info (agg-member-type-size-offset-align (hltype-structure.members a)))
+         (struct-align (hltype.alignof a))
+         ((_ size offset __) (last member-info)))
+    (round-up-to-nearest (+ offset size) struct-align)))
 
 ;;; ast.type methods
 
@@ -165,6 +273,11 @@
      (typespec-equalp aref bref))
     ((list (class typespec-pointer (ref aref)) (class typespec-pointer (ref bref)))
      (typespec-equalp aref bref))
+    ((list (class typespec-array (elt-type a-elt) (size a-size))
+           (class typespec-array (elt-type b-elt) (size b-size)))
+     (and (typespec-equalp a-elt b-elt)
+          (or (and (not a-size) (not b-size))
+              (and a-size b-size (= a-size b-size)))))
     ((list (class typespec-function (ret-type a-ret) (arg-types a-args))
            (class typespec-function (ret-type b-ret) (arg-types b-args)))
      (and (typespec-equalp a-ret b-ret)
@@ -318,17 +431,30 @@
 
 (defmethod gast.emit ((a ast-let))
   (with-slots (bindings body) a
-    (let ((body-emissions (mapcar #'gast.emit body)))
-      ;; LET forms evaluate to the last expression in their body
-      ;; the rest of the result registers are discarded
-      (list (caar (last body-emissions))
-            (mapcar #'second body-emissions)))))
+    (let ((old-scope (state.lex-vars *state*))
+          (new-scope (make-lexical-scope :next old-scope)))
+      (loop for binding in bindings do
+           (push (cons ;; RESUME HERE
+                  ) (lexical-scope.bindings new-scope)))
+      (let ((body-emissions (mapcar #'gast.emit body)))
+        ;; LET forms evaluate to the last expression in their body
+        ;; the rest of the result registers are discarded
+        (list (caar (last body-emissions))
+              (mapcar #'second body-emissions))))))
 
 (defmethod gast.emit ((a ast-var-ref))
   (let ((var (ast-var-ref.var a)))
-    )
-  ;; resume here, mapping decl-variables to IL registers
-  )
+    (ecase (decl-variable.storage var)
+      (:local
+       (let ((il-var (state.lookup-var var)))
+         (unless il-var
+           (error "Lexical variable ~a isn't mapped somehow, this is probably a bug" (decl.name var)))
+         il-var))
+      (:global
+       (let ((glob-var (assoc (state.glob-vars var))))
+         (unless il-var
+           (error "Global variable ~a isn't mapped somehow, this is probably a bug" (decl.name var)))
+         (cdr il-var))))))
 
 ;;; hll struct definition
 
@@ -364,17 +490,22 @@
 
 (defun make-let-bindings (names types% inits%)
   (let ((bindings-and-inits
-         (loop for name in names for i from 0 collect
+         (loop for name in names
+               for i from 0
+               for decl-sym = (gensym "LOCAL") 
+            collect
               (list
                `(make-decl-var-binding :name ',name
                                        :type (nth ,i ,types%)
                                        :init (nth ,i ,inits%))
+               `(,decl-sym
+                 (make-instance 'decl-variable
+                                :name ',name
+                                :type (nth ,i ,types%)
+                                :storage :local))
                `(,name
                  (make-instance 'ast-var-ref
-                                :var (make-instance 'decl-variable
-                                                    :name ',name
-                                                    :type (nth ,i ,types%)
-                                                    :storage :local)))
+                                :var ,decl-sym))
                `(when (nth ,i ,inits%)
                   (binop-= ,name (nth ,i ,inits%)))))))
     (values (mapcar #'first  bindings-and-inits)
@@ -387,13 +518,14 @@
         (names (mapcar #'car args)))
     `(let ((,types% (list ,@(mapcar #'cadr args)))
            (,inits% (list ,@(mapcar #'caddr args))))
-       ,(multiple-value-bind (bindings let-bindings initializers) (make-let-bindings names types% inits%)
+       ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% inits%)
           `(make-instance 'ast-let
                           :bindings (list ,@bindings)
-                          :body (let ,let-bindings
-                                  (list
-                                   ,@initializers
-                                   ,@body)))))))
+                          :body (let ,decl-bindings
+                                  (symbol-macrolet ,macro-bindings
+                                    (list
+                                     ,@initializers
+                                     ,@body))))))))
 
 ;;; hll function definition
 
@@ -403,15 +535,16 @@
         (names (mapcar #'car args)))
     `(let ((,types% (list ,@(mapcar #'cadr args)))
            (,inits% (list ,@(mapcar #'caddr args))))
-       ,(multiple-value-bind (bindings let-bindings initializers) (make-let-bindings names types% inits%)
+       ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% inits%)
           `(make-instance 'decl-function
                           :name (gensym "FN")
                           :ret-type ,ret-type
                           :args (list ,@bindings)
-                          :body (let ,let-bindings
-                                  (list
-                                   ,@initializers
-                                   ,@body)))))))
+                          :body (let ,decl-bindings
+                                  (symbol-macrolet ,macro-bindings
+                                    (list
+                                     ,@initializers
+                                     ,@body))))))))
 
 (defmacro ix-hll-kw:defun (name ret-type args &body body)
   (let ((rest% (gensym))

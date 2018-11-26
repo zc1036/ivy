@@ -16,4 +16,5 @@
   :components ((:file "packages")
                (:file "ix-util")
                (:file "ix-il")
+               (:file "ix-arch")
                (:file "ix-hll")))
