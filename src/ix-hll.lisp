@@ -15,25 +15,25 @@
 (defclass hltype ()
   ((name :type symbol :initarg :name :accessor hltype.name)))
 
-(defstruct (hlt-agg-member (:conc-name hlt-agg-member.))
+(defstruct (hltype-agg-member (:conc-name hltype-agg-member.))
   (name nil :type symbol)
   (type nil :type typespec))
 
-(defclass hlt-structure (hltype)
-  ((members :type (list-of hlt-agg-member)
+(defclass hltype-structure (hltype)
+  ((members :type (list-of hltype-agg-member)
             :initarg :members
-            :accessor hlt-structure.members)))
+            :accessor hltype-structure.members)))
 
-(defclass hlt-union (hltype)
-  ((members :type (list-of hlt-agg-member)
+(defclass hltype-union (hltype)
+  ((members :type (list-of hltype-agg-member)
             :initarg :members
-            :accessor hlt-union.members)))
+            :accessor hltype-union.members)))
 
-(defclass hlt-builtin (hltype)
-  ((signed-p :type boolean :initarg :signed-p :accessor hlt-builtin.signed-p)
-   (float-p  :type boolean :initarg :float-p  :accessor hlt-builtin.float-p)
-   (bytesize :type integer :initarg :bytesize :accessor hlt-builtin.bytesize)
-   (numeric  :type boolean :initarg :numeric  :accessor hlt-builtin.numeric)))
+(defclass hltype-builtin (hltype)
+  ((signed-p :type boolean :initarg :signed-p :accessor hltype-builtin.signed-p)
+   (float-p  :type boolean :initarg :float-p  :accessor hltype-builtin.float-p)
+   (bytesize :type integer :initarg :bytesize :accessor hltype-builtin.bytesize)
+   (numeric  :type boolean :initarg :numeric  :accessor hltype-builtin.numeric)))
 
 ;; typespecs have structural equality
 
@@ -116,7 +116,7 @@
 
 (defstruct (state (:conc-name state.))
   (functions nil :type (list-of decl-function))
-  (lex-vars  nil :type lexical-scope)
+  (lex-vars  nil :type (or null lexical-scope))
   (glob-vars nil :type list)) ;; alist of decl-variables to ix-il:regs
 
 (defparameter *state* (make-state))
@@ -163,10 +163,10 @@
   (hltype.sizeof a))
 
 (defmethod hltype.alignof ((a hltype-structure))
-  (max (mapcar #'typespec.alignof (mapcar #'hlt-agg-member.type (hltype-structure.members a)))))
+  (apply #'max (mapcar #'typespec.alignof (mapcar #'hltype-agg-member.type (hltype-structure.members a)))))
 
 (defmethod hltype.alignof ((a hltype-union))
-  (max (mapcar #'typespec.alignof (mapcar #'hlt-agg-member.type (hltype-union.members a)))))
+  (apply #'max (mapcar #'typespec.alignof (mapcar #'hltype-agg-member.type (hltype-union.members a)))))
 
 ;;; typespec.sizeof functions
 
@@ -199,12 +199,12 @@
   (floor (* (/ (+ (1- round-to) x) round-to) round-to)))
 
 (defun agg-member-type-size-offset-align (members)
-  (let ((sum 0)
-        (mbr-types (mapcar #'hlt-agg-member.type members))
-        (mbr-sizes (mapcar #'typespec.sizeof mbr-types))
-        (mbr-aligns (mapcar #'typespec.alignof mbr-types)))
+  (let* ((sum 0)
+         (mbr-types (mapcar #'hltype-agg-member.type members))
+         (mbr-sizes (mapcar #'typespec.sizeof mbr-types))
+         (mbr-aligns (mapcar #'typespec.alignof mbr-types)))
     (loop
-       for type in types
+       for type in mbr-types
        for size in mbr-sizes
        for align in mbr-aligns
        collect
@@ -214,14 +214,17 @@
 
 (defgeneric hltype.sizeof (hltype))
 
-(defmethod hltype.sizeof ((a hlt-builtin))
-  (hlt-builtin.bytesize a))
+(defmethod hltype.sizeof ((a hltype-builtin))
+  (hltype-builtin.bytesize a))
 
-(defmethod hltype.sizeof ((a hlt-structure))
+(defmethod hltype.sizeof ((a hltype-structure))
   (let+ ((member-info (agg-member-type-size-offset-align (hltype-structure.members a)))
          (struct-align (hltype.alignof a))
-         ((_ size offset __) (last member-info)))
-    (round-up-to-nearest (+ offset size) struct-align)))
+         ((type size offset align) (last member-info)))
+    (progn type align (round-up-to-nearest (+ offset size) struct-align))))
+
+(defmethod hltype.sizeof ((a hltype-union))
+  (apply #'max (mapcar #'second (agg-member-type-size-offset-align (hltype-union.members a)))))
 
 ;;; ast.type methods
 
@@ -260,7 +263,7 @@
 
 (defun is-numeric (x)
   (ematch x
-    ((class typespec-atom (ref (class hlt-builtin numeric)))
+    ((class typespec-atom (ref (class hltype-builtin numeric)))
      numeric)
     ((class typespec)
      nil)))
@@ -325,7 +328,7 @@
 
 ;;; hll global names
 
-(defvar hlts-int32 (make-instance 'hlt-builtin
+(defvar hlts-int32 (make-instance 'hltype-builtin
                                   :signed-p t
                                   :float-p nil
                                   :bytesize 4
@@ -374,16 +377,18 @@
   ((opstr :initform "=")))
 
 (defun binop-= (a b)
-  (unless (typespec-equalp (remove-cv a) (remove-cv b))
-    (error "Assigning an expression of one type to an lvalue of another type"))
-  (when (const-p a)
-    (error "Assigning to a constant expression"))
-  (unless (lvalue-p a)
-    (error "Assigning to a non-lvalue"))
-  (make-instance 'ast-binop-=
-                 :type (ast.type a)
-                 :left a
-                 :right b))
+  (let ((a-type (gast.type a))
+        (b-type (gast.type b)))
+    (unless (typespec-equalp (remove-cv a-type) (remove-cv b-type))
+      (error "Assigning an expression of one type to an lvalue of another type"))
+    (when (const-p a-type)
+      (error "Assigning to a constant expression"))
+    (unless (lvalue-p a)
+      (error "Assigning to a non-lvalue"))
+    (make-instance 'ast-binop-=
+                   :type (ast.type a)
+                   :left a
+                   :right b)))
 
 (define-nary-syntax-by-binary ix-hll-kw:= binop-= :right)
 
@@ -431,14 +436,17 @@
 
 (defmethod gast.emit ((a ast-let))
   (with-slots (bindings body) a
-    (let ((old-scope (state.lex-vars *state*))
-          (new-scope (make-lexical-scope :next old-scope)))
+    (let* ((old-scope (state.lex-vars *state*))
+           (new-scope (make-lexical-scope :next old-scope)))
       (loop for binding in bindings do
-           (push (cons ;; RESUME HERE
-                  ) (lexical-scope.bindings new-scope)))
+           (push (cons (decl-var-binding.name binding)
+                       (ix-il:r (typespec.sizeof (decl-var-binding.type binding))))
+                 (lexical-scope.bindings new-scope)))
+      (setf (state.lex-vars *state*) new-scope)
       (let ((body-emissions (mapcar #'gast.emit body)))
         ;; LET forms evaluate to the last expression in their body
         ;; the rest of the result registers are discarded
+        (setf (state.lex-vars *state*) old-scope)
         (list (caar (last body-emissions))
               (mapcar #'second body-emissions))))))
 
@@ -446,15 +454,15 @@
   (let ((var (ast-var-ref.var a)))
     (ecase (decl-variable.storage var)
       (:local
-       (let ((il-var (state.lookup-var var)))
-         (unless il-var
-           (error "Lexical variable ~a isn't mapped somehow, this is probably a bug" (decl.name var)))
-         il-var))
+       (let ((local-var-pair (state.lookup-var *state* (decl.name var))))
+         (unless local-var-pair
+           (error "Lexical variable ~a isn't mapped somehow, this is probably a bug ~a" var (lexical-scope.bindings (state.lex-vars *state*))))
+         (list local-var-pair ())))
       (:global
-       (let ((glob-var (assoc (state.glob-vars var))))
-         (unless il-var
+       (let ((glob-var-pair (assoc var (state.glob-vars *state*))))
+         (unless glob-var-pair
            (error "Global variable ~a isn't mapped somehow, this is probably a bug" (decl.name var)))
-         (cdr il-var))))))
+         (list (cdr glob-var-pair) ()))))))
 
 ;;; hll struct definition
 
@@ -473,7 +481,7 @@
        `(list ',(car mbr) ,@(cdr mbr))))
 
 (defmacro ix-hll-kw:struct (&body body)
-  `(make-instance 'hlt-structure
+  `(make-instance 'hltype-structure
                   :name (gensym "STRUCT")
                   :members (process-struct-members
                             (list ,@(make-struct-member-specs body)))))
@@ -510,7 +518,8 @@
                   (binop-= ,name (nth ,i ,inits%)))))))
     (values (mapcar #'first  bindings-and-inits)
             (mapcar #'second bindings-and-inits)
-            (mapcar #'third  bindings-and-inits))))
+            (mapcar #'third  bindings-and-inits)
+            (mapcar #'fourth bindings-and-inits))))
 
 (defmacro ix-hll-kw:let (args &body body)
   (let ((types% (gensym "TYPES"))
