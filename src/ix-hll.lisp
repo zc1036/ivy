@@ -71,6 +71,7 @@
 (defclass decl-function (decl)
   ((ret-type :type typespec                   :initarg :ret-type :accessor decl-function.ret-type)
    (args     :type (list-of decl-var-binding) :initarg :args     :accessor decl-function.args)
+   (body-src :type list                       :initarg :body-src :accessor decl-function.body-src)
    (body     :type (list-of gast)             :initarg :body     :accessor decl-function.body)))
 
 (defclass ast ()
@@ -559,6 +560,8 @@
                           :name (gensym "FN")
                           :ret-type ,ret-type
                           :args (list ,@bindings)
+                          :body-src (list ,@(mapcar (lambda (x) `(quote ,x))
+                                                    (append initializers body)))
                           :body (let ,decl-bindings
                                   (symbol-macrolet ,macro-bindings
                                     (list
@@ -607,10 +610,14 @@
   (loop for func in (state.functions *state*) do
        (format t "Function ~a:~%" (decl.name func))
 
-       (with-slots (ret-type args body) func
+       (with-slots (ret-type args body-src body) func
          (with-lexical-scope args
-           (loop for elem in body do
+           (loop for elem in body for elem-src in body-src do
                 (let+ (((result ops) (gast.emit elem)))
                   result
+                  (with-input-from-string (in (format nil "~a" elem-src))
+                    (loop for line = (read-line in nil)
+                          while line
+                       do (format t " ;; ~a~%" line)))
                   (print-instrs ops)
-                  (format t " ;;~%")))))))
+                  (format t " ;~%")))))))
