@@ -23,7 +23,7 @@
 
 (defmethod opnd.repr ((o reg))
   (with-slots (name bytesize) o
-    (format nil "r~a/~a" name bytesize)))
+    (format nil "~a/~a" name bytesize)))
 
 (defmethod opnd.repr ((o imm))
   (with-slots (value bytesize) o
@@ -37,9 +37,11 @@
 
 (defparameter next-reg-num 0)
 
-(defun r (sizespec)
+(defun r (sizespec &optional name)
   (incf next-reg-num)
-  (make-reg :name (format nil "~a" next-reg-num)
+  (make-reg :name (if name
+                      (format nil "~a_~a" name next-reg-num)
+                      (format nil "r~a" next-reg-num))
             :bytesize (etypecase sizespec
                         (number sizespec)
                         (reg (reg.bytesize sizespec)))))

@@ -1,7 +1,7 @@
 
 (defpackage :ix-util
   (:use :cl)
-  (:export :let+))
+  (:export :let+ :with-gensyms))
 
 (defpackage :ix-il
   (:use :cl)

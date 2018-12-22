@@ -434,19 +434,27 @@
       (ix-il:with-reg resreg areg
         (list left-il right-il ainstrs binstrs (ix-il:sub resreg areg breg))))))
 
+(defmacro with-lexical-scope (bindings &body body)
+  ;;; given BINDINGS :: (list-of decl-var-binding), evaluates BODY in a new
+  ;;; lexical context wherein each binding in BINDINGS is active.
+  (with-gensyms (old-scope% new-scope% binding%)
+    `(let* ((,old-scope% (state.lex-vars *state*))
+            (,new-scope% (make-lexical-scope :next ,old-scope%)))
+       (loop for ,binding% in ,bindings do
+            (push (cons (decl-var-binding.name ,binding%)
+                        (ix-il:r (typespec.sizeof (decl-var-binding.type ,binding%)) (decl-var-binding.name ,binding%)))
+                  (lexical-scope.bindings ,new-scope%)))
+       (setf (state.lex-vars *state*) ,new-scope%)
+       (unwind-protect
+            (progn ,@body)
+         (setf (state.lex-vars *state*) ,old-scope%)))))
+
 (defmethod gast.emit ((a ast-let))
   (with-slots (bindings body) a
-    (let* ((old-scope (state.lex-vars *state*))
-           (new-scope (make-lexical-scope :next old-scope)))
-      (loop for binding in bindings do
-           (push (cons (decl-var-binding.name binding)
-                       (ix-il:r (typespec.sizeof (decl-var-binding.type binding))))
-                 (lexical-scope.bindings new-scope)))
-      (setf (state.lex-vars *state*) new-scope)
+    (with-lexical-scope bindings
       (let ((body-emissions (mapcar #'gast.emit body)))
         ;; LET forms evaluate to the last expression in their body
         ;; the rest of the result registers are discarded
-        (setf (state.lex-vars *state*) old-scope)
         (list (caar (last body-emissions))
               (mapcar #'second body-emissions))))))
 
@@ -456,7 +464,9 @@
       (:local
        (let ((local-var-pair (state.lookup-var *state* (decl.name var))))
          (unless local-var-pair
-           (error "Lexical variable ~a isn't mapped somehow, this is probably a bug ~a" var (lexical-scope.bindings (state.lex-vars *state*))))
+           (error "Lexical variable ~a isn't mapped somehow, this is probably a bug ~a"
+                  (decl.name var)
+                  (lexical-scope.bindings (state.lex-vars *state*))))
          (list local-var-pair ())))
       (:global
        (let ((glob-var-pair (assoc var (state.glob-vars *state*))))
@@ -597,8 +607,10 @@
   (loop for func in (state.functions *state*) do
        (format t "Function ~a:~%" (decl.name func))
 
-       (loop for elem in (decl-function.body func) do
-            (let+ (((result ops) (gast.emit elem)))
-              result
-              (print-instrs ops)
-              (format t " ;;~%")))))
+       (with-slots (ret-type args body) func
+         (with-lexical-scope args
+           (loop for elem in body do
+                (let+ (((result ops) (gast.emit elem)))
+                  result
+                  (print-instrs ops)
+                  (format t " ;;~%")))))))
