@@ -1,6 +1,13 @@
 
 (in-package :ix-util)
 
+(defun all-of-type (type list)
+  (every type list))
+
+(deftype list-of (type)
+  (declare (ignore type))
+  'list)
+
 (defun make-let+-binding (bindings body)
   (if bindings
       (if (consp (caar bindings))

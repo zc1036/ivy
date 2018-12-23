@@ -17,4 +17,8 @@
                (:file "ix-util")
                (:file "ix-il")
                (:file "ix-arch")
+               (:file "ix-state")
+               (:file "ix-type")
+               (:file "ix-ast")
+               (:file "ix-target-il")
                (:file "ix-hll")))
