@@ -4,6 +4,8 @@
 (defclass ast ()
   ((type :type typespec :accessor ast.type)))
 
+;; gast = generalized ast, means an ast type OR a literal type (int, string,
+;; etc)
 (deftype gast ()
   '(or ast integer))
 
@@ -207,21 +209,21 @@
 
 (defmacro ix-hll-kw:fun (ret-type args &body body)
   (let ((types% (gensym "TYPES"))
-        (inits% (gensym "INITS"))
         (names (mapcar #'car args)))
-    `(let ((,types% (list ,@(mapcar #'cadr args)))
-           (,inits% (list ,@(mapcar #'caddr args))))
-       ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% inits%)
+    (when (not (every (lambda (x) (= (length x) 2))
+                    args))
+      (error "Malformed argument list ~a" args))
+    `(let ((,types% (list ,@(mapcar #'cadr args))))
+       ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% nil)
           `(make-instance 'decl-function
                           :name (gensym "FN")
                           :ret-type ,ret-type
                           :args (list ,@bindings)
                           :body-src (list ,@(mapcar (lambda (x) `(quote ,x))
-                                                    (append initializers body)))
+                                                    body))
                           :body (let ,decl-bindings
                                   (symbol-macrolet ,macro-bindings
                                     (list
-                                     ,@initializers
                                      ,@body))))))))
 
 (defmacro ix-hll-kw:defun (name ret-type args &body body)

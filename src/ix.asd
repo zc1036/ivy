@@ -21,4 +21,5 @@
                (:file "ix-type")
                (:file "ix-ast")
                (:file "ix-target-il")
+               (:file "ix-target-c")
                (:file "ix-hll")))

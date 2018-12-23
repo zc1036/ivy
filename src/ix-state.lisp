@@ -4,7 +4,9 @@
 ;;; the global hll compiler state
 
 (defstruct (lexical-scope (:conc-name lexical-scope.))
-  (bindings nil :type list) ;; alist map of decl-variables to some target-specific thing (ix-il:reg in some cases)
+  (bindings nil :type list) ;; alist map of decl-variables to some
+                            ;; target-specific thing (ix-il:reg when targetting
+                            ;; IL, etc)
   (next     nil :type (or lexical-scope null)))
 
 (defun lexical-scope.lookup (scope var)
@@ -17,7 +19,9 @@
 (defstruct (state (:conc-name state.))
   (functions nil :type (list-of decl-function))
   (lex-vars  nil :type (or null lexical-scope))
-  (glob-vars nil :type list)) ;; alist of decl-variables to some target-specific thing (ix-il:reg in some cases)
+  (glob-vars nil :type list)) ;; alist map of decl-variables to some             
+                              ;; target-specific thing (ix-il:reg when targetting
+                              ;; IL, etc)                                        
 
 (defun state.lookup-var (state var)
   (lexical-scope.lookup (state.lex-vars state) var))

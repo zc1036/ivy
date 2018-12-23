@@ -16,10 +16,12 @@
          (list b nil)
          (ix-il:with-reg newreg regsize (ix-il:ext newreg b))))))
 
-;;; gast.emit methods
-
 ;; Converts the given gast to IL
-(defgeneric gast.emit (gast))
+(defgeneric gast.emit (gast)
+  (:documentation
+   "Returns a list of two elements, the first being the register in which the
+    result is stored, and the second the instructions required to calculate the
+    value of the register."))
 
 (defmethod gast.emit ((a null))
   ;; nothing
@@ -96,10 +98,10 @@
     (with-lexical-scope args
       (loop for elem in body for elem-src in body-src do
            (let+ (((result ops) (gast.emit elem)))
-                 result
-                 (with-input-from-string (in (format nil "~a" elem-src))
-                   (loop for line = (read-line in nil)
-                      while line
-                      do (format t " ;; ~a~%" line)))
-                 (print-instrs ops)
-                 (format t " ;~%"))))))
+             result
+             (with-input-from-string (in (format nil "~a" elem-src))
+               (loop for line = (read-line in nil)
+                  while line
+                  do (format t " ;; ~a~%" line)))
+             (print-instrs ops)
+             (format t " ;~%"))))))

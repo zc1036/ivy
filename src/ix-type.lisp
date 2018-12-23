@@ -35,13 +35,13 @@
   ((ref :type hltype :initarg :ref :accessor typespec-atom.ref)))
 
 (defclass typespec-const (typespec)
-  ((ref :type hltype :initarg :ref :accessor typespec-const.ref)))
+  ((ref :type typespec :initarg :ref :accessor typespec-const.ref)))
 
 (defclass typespec-volatile (typespec)
-  ((ref :type hltype :initarg :ref :accessor typespec-volatile.ref)))
+  ((ref :type typespec :initarg :ref :accessor typespec-volatile.ref)))
 
 (defclass typespec-pointer (typespec)
-  ((ref :type hltype :initarg :ref :accessor typespec-pointer.ref)))
+  ((ref :type typespec :initarg :ref :accessor typespec-pointer.ref)))
 
 (defclass typespec-array (typespec)
   ((elt-type :type typespec          :initarg :elt-type :accessor typespec-array.elt-type)
@@ -59,10 +59,10 @@
   (hltype.alignof (typespec-atom.ref a)))
 
 (defmethod typespec.alignof ((a typespec-const))
-  (hltype.alignof (typespec-const.ref a)))
+  (typespec.alignof (typespec-const.ref a)))
 
 (defmethod typespec.alignof ((a typespec-volatile))
-  (hltype.alignof (typespec-volatile.ref a)))
+  (typespec.alignof (typespec-volatile.ref a)))
 
 (defmethod typespec.alignof ((a typespec-pointer))
   (/ (arch.bits *target-arch*) 8))
@@ -94,10 +94,10 @@
   (hltype.sizeof (typespec-atom.ref a)))
 
 (defmethod typespec.sizeof ((a typespec-const))
-  (hltype.sizeof (typespec-const.ref a)))
+  (typespec.sizeof (typespec-const.ref a)))
 
 (defmethod typespec.sizeof ((a typespec-volatile))
-  (hltype.sizeof (typespec-volatile.ref a)))
+  (typespec.sizeof (typespec-volatile.ref a)))
 
 (defmethod typespec.sizeof ((a typespec-pointer))
   (/ (arch.bits *target-arch*) 8))

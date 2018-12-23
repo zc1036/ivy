@@ -38,7 +38,10 @@
    :typespec-function :typespec-function.ret-type :typespec-function.arg-types
    :typespec.sizeof :typespec.alignof
    :hltype.sizeof :hltype.alignof
-   :remove-cv :typespec-equalp :is-numeric :const-p))
+   :remove-cv :typespec-equalp :is-numeric :const-p
+
+   ;; slots
+   :name :ret-type :type :members :signed-p :float-p :bytesize :numeric :ref :elt-type :size :arg-types))
 
 (defpackage :ix-ast
   (:use :cl :ix-util :optima :ix-arch :ix-type :ix-state)
@@ -82,5 +85,5 @@
   (:export :emit-decl))
 
 (defpackage :ix-target-c
-  (:use :cl :ix-util :ix-ast :ix-state)
+  (:use :cl :ix-util :ix-ast :ix-state :ix-type)
   (:export :emit-decl))
