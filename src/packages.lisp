@@ -29,7 +29,7 @@
    :hltype-structure :hltype-astructure.members
    :hltype-union :hltype-union.members
    :hltype-builtin :hltype-builtin.signed-p :hltype-builtin.float-p :hltype-builtin.bytesize :hltype-builtin.numeric
-   :typespec
+   :typespec :typespec.to-string
    :typespec-atom :typespec-atom.ref
    :typespec-const :typespec-const.ref
    :typespec-volatile :typespec-volatile.ref
@@ -69,7 +69,7 @@
   (:export
    :fun :struct
    :defun :defstruct
-   :int32
+   :int16 :int32
    :+ :- :=
    :let))
 

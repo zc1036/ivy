@@ -51,6 +51,34 @@
   ((ret-type  :type typespec           :initarg :ret-type  :accessor typespec-function.ret-type)
    (arg-types :type (list-of typespec) :initarg :arg-types :accessor typespec-function.arg-types)))
 
+;;; typespec.to-string functions
+
+(defgeneric typespec.to-string (typespec))
+
+(defmethod typespec.to-string ((ts typespec-atom))
+  (format nil "~a" (hltype.name (typespec-atom.ref ts))))
+
+(defmethod typespec.to-string ((ts typespec-const))
+  (format nil "(const ~a)" (typespec.to-string (typespec-const.ref ts))))
+
+(defmethod typespec.to-string ((ts typespec-volatile))
+  (format nil "(vltl ~a)" (typespec.to-string (typespec-volatile.ref ts))))
+
+(defmethod typespec.to-string ((ts typespec-pointer))
+  (format nil "(* ~a)" (typespec.to-string (typespec-pointer.ref ts))))
+
+(defmethod typespec.to-string ((ts typespec-array))
+  (if (typespec-array.size ts)
+      (format nil "(array ~a ~a)"
+              (typespec.to-string (typespec-pointer.ref ts))
+              (typespec-pointer.size ts))
+      (format nil "(array ~a)" (typespec.to-string (typespec-pointer.ref ts)))))
+
+(defmethod typespec.to-string ((ts typespec-function))
+  (format nil "(function ~a ~a)"
+          (typespec.to-string (typespec-function.ret-type ts))
+          (mapcar #'typespec.to-string (typespec-function.arg-types ts))))
+
 ;;; typespec.alignof functions
 
 (defgeneric typespec.alignof (typespec))
@@ -226,3 +254,11 @@
 
 (defvar ix-hll-kw:int32 (make-instance 'typespec-atom :ref hlts-int32))
 
+(defvar hlts-int16 (make-instance 'hltype-builtin
+                                  :signed-p t
+                                  :float-p nil
+                                  :bytesize 2
+                                  :name :int16
+                                  :numeric t))
+
+(defvar ix-hll-kw:int16 (make-instance 'typespec-atom :ref hlts-int16))

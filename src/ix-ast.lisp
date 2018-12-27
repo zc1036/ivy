@@ -205,6 +205,20 @@
                                      ,@initializers
                                      ,@body))))))))
 
+(defun make-funcall (funcref args)
+  (let ((func (ast-func-ref.func funcref)))
+    (loop for arg in args for param in (decl-function.args func) do
+         (when (not (typespec-equalp (remove-cv (gast.type arg))
+                                     (remove-cv (decl-var-binding.type param))))
+           (error "Argument incompatible with parameter ~a in call to ~a; expected ~a, got ~a"
+                  (decl-var-binding.name param)
+                  (decl.name func)
+                  (typespec.to-string (decl-var-binding.type param))
+                  (typespec.to-string (gast.type arg))))))
+  (make-instance 'ast-funcall
+                 :target funcref
+                 :args args))
+
 ;;; hll function definition
 
 (defmacro ix-hll-kw:fun (ret-type args &body body)
@@ -239,9 +253,7 @@
        (setf ,name (make-instance 'ast-func-ref))
 
        (defun ,name (&rest ,rest%)
-         (make-instance 'ast-funcall
-                        :target ,name
-                        :args ,rest%))
+         (make-funcall ,name ,rest%))
 
        (let* ((,ret-type% ,ret-type)
               (,fn% (ix-hll-kw:fun ,ret-type% ,args ,@body)))
@@ -251,7 +263,7 @@
          ;; because in the case of recursive functions, we want them to be able
          ;; to grab a reference to themselves before that reference is filled
          ;; out
-         (setf (ast.type ,name)
+        (setf (ast.type ,name)
                (make-instance 'typespec-function
                               :ret-type ,ret-type%
                               :arg-types (mapcar #'decl-var-binding.type

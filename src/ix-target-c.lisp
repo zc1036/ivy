@@ -10,39 +10,39 @@
   `(let ((*indent* (+ *indent* 2)))
      ,@body))
 
-(defgeneric typespec.to-string* (td name &optional extra))
+(defgeneric typespec.to-c-string* (td name &optional extra))
 
-(defmethod typespec.to-string* ((td typespec-atom) name &optional extra)
+(defmethod typespec.to-c-string* ((td typespec-atom) name &optional extra)
   extra
   (format nil "~a~a~a" (hltype.name (typespec-atom.ref td)) (if (= (length name) 0) "" " ") name))
 
-(defmethod typespec.to-string* ((td typespec-pointer) name &optional extra)
+(defmethod typespec.to-c-string* ((td typespec-pointer) name &optional extra)
   extra
-  (typespec.to-string* (typespec-pointer.ref td) (format nil "* ~a" name)))
+  (typespec.to-c-string* (typespec-pointer.ref td) (format nil "* ~a" name)))
 
-(defmethod typespec.to-string* ((td typespec-function) name &optional arg-names)
+(defmethod typespec.to-c-string* ((td typespec-function) name &optional arg-names)
   (with-slots (ret-type arg-types) td
-    (typespec.to-string*
+    (typespec.to-c-string*
      ret-type
      (format nil "(~a)(~{~A~^, ~})"
              name
              (if arg-names
-                 (mapcar (lambda (x y) (typespec.to-string* x (symbol-name y)))
+                 (mapcar (lambda (x y) (typespec.to-c-string* x (symbol-name y)))
                          arg-types arg-names)
-                 (mapcar #'typespec.to-string* arg-types))))))
+                 (mapcar #'typespec.to-c-string* arg-types))))))
 
-(defmethod typespec.to-string* ((td typespec-volatile) name &optional extra)
+(defmethod typespec.to-c-string* ((td typespec-volatile) name &optional extra)
   extra
-  (typespec.to-string* (typespec-volatile.ref td) (format nil "volatile ~a" name)))
+  (typespec.to-c-string* (typespec-volatile.ref td) (format nil "volatile ~a" name)))
 
-(defmethod typespec.to-string* ((td typespec-const) name &optional extra)
+(defmethod typespec.to-c-string* ((td typespec-const) name &optional extra)
   extra
-  (typespec.to-string* (typespec-const.ref td) (format nil "const ~a" name)))
+  (typespec.to-c-string* (typespec-const.ref td) (format nil "const ~a" name)))
 
-(defmethod typespec.to-string* ((td typespec-array) name &optional extra)
+(defmethod typespec.to-c-string* ((td typespec-array) name &optional extra)
   extra
   (with-slots (elt-type size) td
-    (typespec.to-string*
+    (typespec.to-c-string*
      elt-type
      (format nil "(~a)[~a]"
              name
@@ -50,8 +50,8 @@
                  (gast.emit size)
                  "")))))
 
-(defun typespec.to-string (td &optional (name ""))
-  (typespec.to-string* td name))
+(defun typespec.to-c-string (td &optional (name ""))
+  (typespec.to-c-string* td name))
 
 (defgeneric gast.emit (gast))
 
@@ -127,7 +127,7 @@
   (with-slots (name ret-type args body-src body) decl
     (with-lexical-scope args
       (format t "~a {~%"
-              (typespec.to-string*
+              (typespec.to-c-string*
                (make-instance 'typespec-function
                               :ret-type ret-type
                               :arg-types (mapcar #'decl-var-binding.type args))
