@@ -29,8 +29,8 @@
    (storage  :type symbol   :initarg :storage :accessor decl-variable.storage)))
 
 (defclass ast-funcall (ast)
-  ((target :type gast           :initarg :expr :accessor ast-funcall.target)
-   (args   :type (list-of gast) :initarg :args :accessor ast-funcall.args)))
+  ((target :type gast           :initarg :target :accessor ast-funcall.target)
+   (args   :type (list-of gast) :initarg :args   :accessor ast-funcall.args)))
 
 (defclass ast-var-ref (ast)
   ((var :type decl-variable :initarg :var :accessor ast-var-ref.var)))
@@ -236,19 +236,25 @@
        (when ,name
          (error "Defining function ~a: name already defined" ',name))
 
-       (let* ((,ret-type% ,ret-type)
-              (,fn% (ix-hll-kw:fun ,ret-type% ,args ,@body)))
-         (setf (decl.name ,fn%) ',name)
-         (push ,fn% (state.functions *state*))
-         (setf ,name (make-instance 'ast-func-ref
-                                    :type (make-instance 'typespec-function
-                                                         :ret-type ,ret-type%
-                                                         :arg-types (mapcar #'decl-var-binding.type
-                                                                            (decl-function.args ,fn%)))
-                                    :func (car (state.functions *state*)))))
+       (setf ,name (make-instance 'ast-func-ref))
 
        (defun ,name (&rest ,rest%)
          (make-instance 'ast-funcall
                         :target ,name
-                        :args ,rest%)))))
+                        :args ,rest%))
 
+       (let* ((,ret-type% ,ret-type)
+              (,fn% (ix-hll-kw:fun ,ret-type% ,args ,@body)))
+         (setf (decl.name ,fn%) ',name)
+         (push ,fn% (state.functions *state*))
+         ;; we do this here rather than moving the setf of ,name down here
+         ;; because in the case of recursive functions, we want them to be able
+         ;; to grab a reference to themselves before that reference is filled
+         ;; out
+         (setf (ast.type ,name)
+               (make-instance 'typespec-function
+                              :ret-type ,ret-type%
+                              :arg-types (mapcar #'decl-var-binding.type
+                                                 (decl-function.args ,fn%))))
+         (setf (ast-func-ref.func ,name)
+               (car (state.functions *state*)))))))

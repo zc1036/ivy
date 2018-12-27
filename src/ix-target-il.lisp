@@ -76,7 +76,7 @@
   (let ((var (ast-var-ref.var a)))
     (ecase (decl-variable.storage var)
       (:local
-       (let ((local-var-pair (state.lookup-var *state* (decl.name var))))
+       (let ((local-var-pair (state.lookup-lexical-var *state* (decl.name var))))
          (unless local-var-pair
            (error "Lexical variable ~a isn't mapped somehow, this is probably a bug ~a"
                   (decl.name var)

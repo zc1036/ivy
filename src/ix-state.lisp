@@ -23,7 +23,7 @@
                               ;; target-specific thing (ix-il:reg when targetting
                               ;; IL, etc)                                        
 
-(defun state.lookup-var (state var)
+(defun state.lookup-lexical-var (state var)
   (lexical-scope.lookup (state.lex-vars state) var))
 
 (defparameter *state* nil)

@@ -18,7 +18,7 @@
   (:use :cl :ix-util :ix-arch)
   (:export
    :lexical-scope :make-lexical-scope :lexical-scope.bindings :lexical-scope.next :lexical-scope.lookup
-   :state :make-state :state.functions :state.lex-vars :state.glob-vars :state.lookup-var
+   :state :make-state :state.functions :state.lex-vars :state.glob-vars :state.lookup-lexical-var
    :*state* :*target-arch*))
 
 (defpackage :ix-type
@@ -48,7 +48,7 @@
   (:export
    :ast :ast.type
    :gast
-   :ast-funcall :ast-funcall..target :ast-funcall.args
+   :ast-funcall :ast-funcall.target :ast-funcall.args
    :decl :decl.name
    :decl-var-binding :decl-var-binding.name :decl-var-binding.type :decl-var-binding.init
    :decl-function :decl-function.ret-type :decl-function.args :decl-function.body-src :decl-function.body

@@ -76,7 +76,7 @@
   (let ((var (ast-var-ref.var a)))
     (ecase (decl-variable.storage var)
       (:local
-       (let ((local-var-pair (state.lookup-var *state* (decl.name var))))
+       (let ((local-var-pair (state.lookup-lexical-var *state* (decl.name var))))
          (unless local-var-pair
            (error "Lexical variable ~a isn't mapped somehow, this is probably a bug ~a"
                   (decl.name var)
@@ -88,6 +88,14 @@
            (error "Global variable ~a isn't mapped somehow, this is probably a bug" (decl.name var)))
          (list (cdr glob-var-pair) ()))))))
 
+(defmethod gast.emit ((a ast-func-ref))
+  (format nil "~a" (decl.name (ast-func-ref.func a))))
+
+(defmethod gast.emit ((a ast-funcall))
+  (format nil "(~a(~{~a~^, ~}))"
+          (gast.emit (ast-funcall.target a))
+          (mapcar #'gast.emit (ast-funcall.args a))))
+
 (defmacro with-lexical-scope (bindings &body body)
   ;;; given BINDINGS :: (list-of decl-var-binding), evaluates BODY in a new
   ;;; lexical context wherein each binding in BINDINGS is active.
@@ -96,8 +104,7 @@
             (,new-scope% (make-lexical-scope :next ,old-scope%)))
        (loop for ,binding% in ,bindings do
             (push (cons (decl-var-binding.name ,binding%)
-                        ,binding% ;; (ix-il:r (typespec.sizeof (decl-var-binding.type ,binding%)) (decl-var-binding.name ,binding%))
-                        )
+                        t) ;; (ix-il:r (typespec.sizeof (decl-var-binding.type ,binding%)) (decl-var-binding.name ,binding%))
                   (lexical-scope.bindings ,new-scope%)))
        (setf (state.lex-vars *state*) ,new-scope%)
        (unwind-protect
@@ -128,5 +135,5 @@
                (mapcar #'decl-var-binding.name args)))
       (new-indent
        (loop for elem in body for elem-src in body-src do
-            (format t "  ~a;~%" (gast.emit elem))))
+            (format t "~a~a;~%" (indent) (gast.emit elem))))
       (format t "}~%"))))

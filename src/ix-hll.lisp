@@ -36,7 +36,7 @@
            (let ((*package* (find-package 'ix-hll-user)))
              (load arg))
 
-           (loop for func in (state.functions *state*) do
+           (loop for func in (reverse (state.functions *state*)) do
                 (format t "Function ~a:~%" (decl.name func))
 
                 (funcall *target* func))))))
