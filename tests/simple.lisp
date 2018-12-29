@@ -2,9 +2,9 @@
 (defstruct foo
   (hi int32))
 
-(defun blah int32 ((face int32) (face2 int32))
+(defun blah int16 ((face int32) (face2 int32))
        (let ((x int32 (+ face2 face 45)))
-         x))
+         (= face x)))
 
-(defun berp int32 ((face int32))
-       (blah 2 face))
+(defun berp int32 ((face int32) (asdf int16) (arr (& int32)))
+       (+ asdf (blah 2 (aref arr asdf))))

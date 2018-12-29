@@ -1,6 +1,20 @@
 
 (in-package :ix-target-il)
 
+#|
+
+General workings of the IL target:
+
+The IX-IL package defines classes that describe the IL operators and
+operands. The IL is a simple register-based linear language. It is not in SSA
+form yet.
+
+After converting an AST into a linear IL representation, we scan the IL and
+convert it to a CFG. Then we transform that IL+CFG into another IL+CFG with all
+the assignment instructions replaced by PHI instructions to make it SSA.
+
+|#
+
 ;;; gast.emit helpers
 
 (defun reg-extend (a b)
@@ -20,16 +34,17 @@
 (defgeneric gast.emit (gast)
   (:documentation
    "Returns a list of two elements, the first being the register in which the
-    result is stored, and the second the instructions required to calculate the
-    value of the register."))
+    result is stored, and the second a (possibly nested; the list is flattened
+    before processing) list of the instructions required to calculate the value
+    of the register."))
 
 (defmethod gast.emit ((a null))
   ;; nothing
   (list () ()))
 
 (defmethod gast.emit ((a integer))
-  (let* ((imm (ix-il:i a))
-         (reg (ix-il:r (ix-il:imm.bytesize imm))))
+  (let* ((imm (ix-il:i a 4))
+         (reg (ix-il:r 4)))
     (list reg (ix-il:move reg imm))))
 
 (defmethod gast.emit ((a ast-binop-+))
@@ -47,6 +62,51 @@
            (((areg ainstrs) (breg binstrs)) (reg-extend left-res right-res)))
       (ix-il:with-reg resreg areg
         (list left-il right-il ainstrs binstrs (ix-il:sub resreg areg breg))))))
+
+(defmethod gast.emit ((a ast-binop-=))
+  (with-slots (left right) a
+    ;; this is a reiteration of the types supported in ix-ast:lvalue-p
+    (ematch left
+      ((class ast-var-ref)
+       (let+ (((left-res left-il)   (gast.emit left))
+              ((right-res right-il) (gast.emit right)))
+         (list left-res (list left-il right-il (ix-il:move left-res right-res)))))
+      ((class ast-binop-aref (left base) (right offset))
+       (let+ (((base-res base-il)     (gast.emit base))
+              ((offset-res offset-il) (gast.emit offset))
+              ((elt-res elt-il)       (gast.emit right)))
+         ;; we have two different types of assignment, one requiring a
+         ;; dereference (a pointer) and one not (a structure/union/array)
+         (list elt-res (list base-il offset-il elt-il
+                             (etypecase (gast.type base)
+                               (typespec-pointer
+                                (ix-il:pset base-res offset-res elt-res))
+                               (typespec-array
+                                (ix-il:rset base-res offset-res elt-res))))))))))
+
+(defmethod gast.emit ((a ast-funcall))
+  (with-slots (target args) a
+    (let* ((arg-gen (mapcar #'gast.emit args))
+           (arg-regs (mapcar #'first arg-gen))
+           (arg-instrs (mapcar #'second arg-gen))
+           (result (ix-il:r (typespec.sizeof (gast.type a)))))
+      (etypecase target
+        (ast-func-ref
+         (list result (list arg-instrs (ix-il:dcall result (decl.name (ast-func-ref.func target)) arg-regs))))
+        (t
+         (list result (list arg-instrs (ix-il:icall result (decl.name (ast-func-ref.func target)) arg-regs))))))))
+
+(defmethod gast.emit ((a ast-binop-aref))
+  (with-slots (left right) a
+    (let+ (((left-res left-il)   (gast.emit left))
+           ((right-res right-il) (gast.emit right)))
+      (ematch (remove-cv (gast.type left))
+        ((class typespec-pointer ref)
+         (ix-il:with-reg result (typespec.sizeof ref)
+           (list left-il right-il (ix-il:pget result left-res right-res))))
+        ((class typespec-array elt-type)
+         (ix-il:with-reg result (typespec.sizeof elt-type)
+           (list left-il right-il (ix-il:rget result left-res right-res))))))))
 
 (defmacro with-lexical-scope (bindings &body body)
   ;;; given BINDINGS :: (list-of decl-var-binding), evaluates BODY in a new

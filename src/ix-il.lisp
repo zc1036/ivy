@@ -55,7 +55,24 @@
   `(let ((,regname (r ,size)))
      (list ,regname ,@body)))
 
-;;; binary operators
+;;; ternary non-write-back operators
+
+(defclass tern-optr (optr)
+  ((a :type opnd :initarg :a :accessor tern-optr.a)
+   (b :type opnd :initarg :b :accessor tern-optr.b)
+   (c :type opnd :initarg :c :accessor tern-optr.c)))
+
+(defmacro define-tern-optr (fname classname nicename)
+  `(progn
+     (defclass ,classname (tern-optr)
+       ((name :initform ,nicename)))
+     (defun ,fname (a b c)
+       (make-instance ',classname :a a :b b :c c))))
+
+(define-tern-optr rset ternop-rset "rset")
+(define-tern-optr pset ternop-pset "pset")
+
+;;; binary write-back operators
 
 (defclass bin-optr (optr)
   ((a   :type reg  :initarg :a   :accessor bin-optr.a)
@@ -72,7 +89,10 @@
 (define-bin-optr add binop-add "add")
 (define-bin-optr sub binop-sub "sub")
 
-;;; unary operators
+(define-bin-optr rget binop-rget "rget")
+(define-bin-optr pget binop-pget "pget")
+
+;;; unary operators write-back operators
 
 (defclass un-optr (optr)
   ((a   :type opnd :initarg :a   :accessor un-optr.a)
@@ -86,8 +106,26 @@
        (make-instance ',classname :a a :dst dst))))
 
 (define-un-optr move unop-move "move")
-
 (define-un-optr ext unop-ext "ext")
+
+;;; nary write-back operators
+
+(defclass call (optr)
+  ((result :type reg    :initarg :result :accessor call.result)
+   (target :type symbol :initarg :target :accessor call.target)
+   (args   :type list   :initarg :args   :accessor call.target)))
+
+(defclass dcall (call)
+  ((name   :initform "dcall")))
+
+(defclass icall (call)
+  ((name   :initform "icall")))
+
+(defun dcall (result target args)
+  (make-instance 'dcall :result result :target target :args args))
+
+(defun icall (result target args)
+  (make-instance 'icall :result result :target target :args args))
 
 ;;; optr.repr definitions
 
@@ -98,3 +136,11 @@
 (defmethod optr.repr ((o un-optr))
   (with-slots (name a dst) o
     (format nil "~a ~a, ~a" name (opnd.repr dst) (opnd.repr a))))
+
+(defmethod optr.repr ((o call))
+  (with-slots (name result target args) o
+    (format nil "~a ~{~a~^, ~}" name (list* (opnd.repr result) target (mapcar #'opnd.repr args)))))
+
+(defmethod optr.repr ((o tern-optr))
+  (with-slots (name a b c) o
+    (format nil "~a ~a, ~a, ~a" name (opnd.repr a) (opnd.repr b) (opnd.repr c))))

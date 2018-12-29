@@ -65,14 +65,14 @@
   (format nil "(vltl ~a)" (typespec.to-string (typespec-volatile.ref ts))))
 
 (defmethod typespec.to-string ((ts typespec-pointer))
-  (format nil "(* ~a)" (typespec.to-string (typespec-pointer.ref ts))))
+  (format nil "(& ~a)" (typespec.to-string (typespec-pointer.ref ts))))
 
 (defmethod typespec.to-string ((ts typespec-array))
   (if (typespec-array.size ts)
       (format nil "(array ~a ~a)"
-              (typespec.to-string (typespec-pointer.ref ts))
-              (typespec-pointer.size ts))
-      (format nil "(array ~a)" (typespec.to-string (typespec-pointer.ref ts)))))
+              (typespec.to-string (typespec-array.elt-type ts))
+              (typespec-array.size ts))
+      (format nil "(array ~a)" (typespec.to-string (typespec-array.elt-type ts)))))
 
 (defmethod typespec.to-string ((ts typespec-function))
   (format nil "(function ~a ~a)"
@@ -244,6 +244,35 @@
     (_ nil)))
 
 ;;; hll global names
+
+(defun ix-hll-kw:function (ret-type arg-types)
+  (check-type elt-type typespec)
+
+  (loop for arg-type in arg-types do
+       (check-type arg-type typespec))
+
+  (make-instance 'typespec-function :ret-type ret-type :arg-types arg-types))
+
+(defun ix-hll-kw:array (elt-type &optional size)
+  (check-type elt-type typespec)
+  (check-type size (or null integer))
+
+  (make-instance 'typespec-array :elt-type elt-type :size size))
+
+(defun ix-hll-kw:& (ref)
+  (check-type ref typespec)
+
+  (make-instance 'typespec-pointer :ref ref))
+
+(defun ix-hll-kw:const (ref)
+  (check-type ref typespec)
+
+  (make-instance 'typespec-const :ref ref))
+
+(defun ix-hll-kw:vltl (ref)
+  (check-type ref typespec)
+
+  (make-instance 'typespec-volatile :ref ref))
 
 (defvar hlts-int32 (make-instance 'hltype-builtin
                                   :signed-p t

@@ -75,8 +75,8 @@
 
 (defun lvalue-p (a)
   (typecase a
-    (ast-binop-= t)
-    (ast-var-ref t)))
+    (ast-var-ref t)
+    (ast-binop-aref t)))
 
 ;;; hll operators
 
@@ -90,7 +90,7 @@
              `(,binop-fn-name a (apply #',nary-fn-name (cons b args)))))
          (,binop-fn-name a b))))
 
-(defmacro define-numeric-binary-operator-with-nary-syntax (opstr assoc binop-fn-name binop-class-name nary-fn-name)
+(defmacro define-binary-operator-with-nary-syntax (opstr assoc binop-fn-name binop-class-name nary-fn-name type-check type-result)
   `(progn
      (defclass ,binop-class-name (ast-binop)
        ((opstr :initform ,opstr)))
@@ -100,19 +100,38 @@
               (b-type (gast.type b))
               (a-type-nocv (remove-cv a-type))
               (b-type-nocv (remove-cv b-type)))
-         (unless (and (is-numeric a-type-nocv) (is-numeric b-type-nocv))
-           (error "Applying binary operator ~a to expressions of non-numeric type" ,opstr))
-         (unless (typespec-equalp a-type-nocv b-type-nocv)
-           (error "Applying binary operator ~a to expressions of different types" ,opstr))
+         (unless (,type-check a-type-nocv b-type-nocv)
+           (error "Applying binary operator ~a to expressions of incorrect type" ,opstr))
          (make-instance ',binop-class-name
-                        :type a-type-nocv
+                        :type (,type-result a-type-nocv b-type-nocv)
                         :left a
                         :right b)))
 
      (define-nary-syntax-by-binary ,nary-fn-name ,binop-fn-name ,assoc)))
 
-(define-numeric-binary-operator-with-nary-syntax "+" :left binop-+ ast-binop-+ ix-hll-kw:+)
-(define-numeric-binary-operator-with-nary-syntax "-" :left binop-- ast-binop-- ix-hll-kw:-)
+(defun numeric-binop-type-check (atype-nocv btype-nocv)
+  (and (is-numeric atype-nocv)
+       (is-numeric btype-nocv)
+       (typespec-equalp atype-nocv btype-nocv)))
+
+(defun numeric-type-result (atype-nocv btype-nocv)
+  (declare (ignore btype-nocv))
+  atype-nocv)
+
+(defun aref-type-check (atype-nocv btype-nocv)
+  (and (or (typecase atype-nocv
+             (typespec-pointer t)
+             (typespec-array t)))
+       (is-numeric btype-nocv)))
+
+(defun aref-type-result (atype-nocv btype-nocv)
+  (ematch atype-nocv
+    ((typespec-pointer ref) ref)
+    ((typespec-array elt-type) elt-type)))
+
+(define-binary-operator-with-nary-syntax "+"    :left binop-+    ast-binop-+    ix-hll-kw:+    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "-"    :left binop--    ast-binop--    ix-hll-kw:-    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ix-hll-kw:aref aref-type-check aref-type-result)
 
 (defclass ast-binop-= (ast-binop)
   ((opstr :initform "=")))
@@ -122,10 +141,10 @@
         (b-type (gast.type b)))
     (unless (typespec-equalp (remove-cv a-type) (remove-cv b-type))
       (error "Assigning an expression of one type to an lvalue of another type"))
-    (when (const-p a-type)
-      (error "Assigning to a constant expression"))
     (unless (lvalue-p a)
       (error "Assigning to a non-lvalue"))
+    (when (const-p a-type)
+      (error "Assigning to a constant expression"))
     (make-instance 'ast-binop-=
                    :type (ast.type a)
                    :left a

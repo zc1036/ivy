@@ -88,6 +88,12 @@
            (error "Global variable ~a isn't mapped somehow, this is probably a bug" (decl.name var)))
          (list (cdr glob-var-pair) ()))))))
 
+(defmethod gast.emit ((a ast-binop-aref))
+  (with-slots (left right) a
+    (format nil "(~a[~a])"
+            (gast.emit left)
+            (gast.emit right))))
+
 (defmethod gast.emit ((a ast-func-ref))
   (format nil "~a" (decl.name (ast-func-ref.func a))))
 

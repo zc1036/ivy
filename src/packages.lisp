@@ -6,7 +6,7 @@
 (defpackage :ix-il
   (:use :cl)
   (:export :r :i :optr :optr.repr
-           :move :ext :add :sub
+           :move :ext :add :sub :icall :dcall :pset :rset :pget :rget
            :reg.name :reg.bytesize :imm.value :imm.bytesize
            :with-reg))
 
@@ -58,7 +58,7 @@
    :ast-binop :ast-binop.left :ast-binop.right :ast-binop.opstr
    :ast-let :ast-let.bindings :ast-let.body
    :ast.type :gast.type
-   :binop-+ :ast-binop-+ :binop-- :ast-binop-- :ast-binop-= :binop-=
+   :binop-+ :ast-binop-+ :binop-- :ast-binop-- :ast-binop-= :binop-= :binop-aref :ast-binop-aref
    :lvalue-p
 
    ;; slots
@@ -67,10 +67,12 @@
 
 (defpackage :ix-hll-kw
   (:export
+   :function :array :const :vltl :&
    :fun :struct
    :defun :defstruct
    :int16 :int32
    :+ :- :=
+   :aref
    :let))
 
 (defpackage :ix-hll
@@ -81,7 +83,7 @@
   (:use :ix-hll-kw))
 
 (defpackage :ix-target-il
-  (:use :cl :ix-util :ix-ast :ix-state :ix-type)
+  (:use :cl :ix-util :ix-ast :ix-state :ix-type :optima)
   (:export :emit-decl))
 
 (defpackage :ix-target-c
