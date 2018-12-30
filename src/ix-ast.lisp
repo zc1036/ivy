@@ -49,6 +49,10 @@
   ((bindings :type (list-of decl-var-binding) :initarg :bindings :accessor ast-let.bindings)
    (body     :type (list-of gast)             :initarg :body     :accessor ast-let.body)))
 
+(defclass ast-while (ast)
+  ((condition :type gast           :initarg :condition :accessor ast-while.condition)
+   (body      :type (list-of gast) :initarg :body      :accessor ast-while.body)))
+
 ;;; ast.type methods
 
 (defmethod ast.type ((x ast-funcall))
@@ -223,6 +227,16 @@
                                     (list
                                      ,@initializers
                                      ,@body))))))))
+
+(defmacro ix-hll-kw:while (condition &body body)
+  (let ((cond% (gensym)))
+    `(progn
+       (let ((,cond% ,condition))
+         (unless (is-numeric (gast.type ,cond%))
+           (error "Condition of while-loop must be integral"))
+         (make-instance 'ast-while
+                        :condition ,cond%
+                        :body (list ,@body))))))
 
 (defun make-funcall (funcref args)
   (let ((func (ast-func-ref.func funcref)))

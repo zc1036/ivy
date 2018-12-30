@@ -246,7 +246,7 @@
 ;;; hll global names
 
 (defun ix-hll-kw:function (ret-type arg-types)
-  (check-type elt-type typespec)
+  (check-type ret-type typespec)
 
   (loop for arg-type in arg-types do
        (check-type arg-type typespec))

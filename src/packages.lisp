@@ -6,7 +6,7 @@
 (defpackage :ix-il
   (:use :cl)
   (:export :r :i :optr :optr.repr
-           :move :ext :add :sub :icall :dcall :pset :rset :pget :rget
+           :move :ext :add :sub :icall :dcall :pset :rset :pget :rget :jump :jumpc :jump-target
            :reg.name :reg.bytesize :imm.value :imm.bytesize
            :with-reg))
 
@@ -59,17 +59,19 @@
    :ast-let :ast-let.bindings :ast-let.body
    :ast.type :gast.type
    :binop-+ :ast-binop-+ :binop-- :ast-binop-- :ast-binop-= :binop-= :binop-aref :ast-binop-aref
+   :ast-while
    :lvalue-p
 
    ;; slots
    :type :name :init :ret-type :args :body-src :body :type :storage :target
-   :var :func :left :right :opstr :bindings))
+   :var :func :left :right :opstr :bindings :condition))
 
 (defpackage :ix-hll-kw
   (:export
    :function :array :const :vltl :&
    :fun :struct
    :defun :defstruct
+   :while
    :int16 :int32
    :+ :- :=
    :aref

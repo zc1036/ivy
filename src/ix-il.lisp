@@ -92,7 +92,7 @@
 (define-bin-optr rget binop-rget "rget")
 (define-bin-optr pget binop-pget "pget")
 
-;;; unary operators write-back operators
+;;; unary write-back operators
 
 (defclass un-optr (optr)
   ((a   :type opnd :initarg :a   :accessor un-optr.a)
@@ -107,6 +107,31 @@
 
 (define-un-optr move unop-move "move")
 (define-un-optr ext unop-ext "ext")
+
+;;; nullary and unary non-write-back operators
+
+(defclass jump-target (optr)
+  ((id :type integer :initarg :id :accessor jump-target.id)))
+
+(defparameter *next-jump-target* 0)
+
+(defun jump-target ()
+  (make-instance 'jump-target :id (incf *next-jump-target*)))
+
+(defclass jump (optr)
+  ((target :type jump-target    :initarg :target :accessor jump.target)
+   (a      :type (or null opnd) :initarg :a      :accessor jump.a)
+   (b      :type (or null opnd) :initarg :b      :accessor jump.b)
+
+   ;; CONDITION is one of: :UNCONDITIONAL :< :<= :> :>= := :/=
+   ;;                        
+   (condition :type symbol :initarg :condition :accessor jump.condition)))
+
+(defun jumpc (a condition b tgt)
+  (make-instance 'jump :a a :b b :condition condition :target tgt))
+
+(defun jump (tgt)
+  (make-instance 'jump :condition :unconditional :target tgt))
 
 ;;; nary write-back operators
 
@@ -144,3 +169,12 @@
 (defmethod optr.repr ((o tern-optr))
   (with-slots (name a b c) o
     (format nil "~a ~a, ~a, ~a" name (opnd.repr a) (opnd.repr b) (opnd.repr c))))
+
+(defmethod optr.repr ((o jump))
+  (with-slots (a b condition target) o
+    (if (eq condition :unconditional)
+        (format nil "jump LABEL~a" (jump-target.id target))
+        (format nil "jumpc LABEL~a, ~a ~a ~a" (jump-target.id target) (opnd.repr a) condition (opnd.repr b)))))
+
+(defmethod optr.repr ((o jump-target))
+  (format nil "LABEL~a:" (jump-target.id o)))

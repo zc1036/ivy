@@ -90,11 +90,12 @@ the assignment instructions replaced by PHI instructions to make it SSA.
            (arg-regs (mapcar #'first arg-gen))
            (arg-instrs (mapcar #'second arg-gen))
            (result (ix-il:r (typespec.sizeof (gast.type a)))))
-      (etypecase target
-        (ast-func-ref
-         (list result (list arg-instrs (ix-il:dcall result (decl.name (ast-func-ref.func target)) arg-regs))))
-        (t
-         (list result (list arg-instrs (ix-il:icall result (decl.name (ast-func-ref.func target)) arg-regs))))))))
+      (list result (list arg-instrs
+                         (etypecase target
+                           (ast-func-ref
+                            (ix-il:dcall result (decl.name (ast-func-ref.func target)) arg-regs))
+                           (t
+                            (ix-il:icall result (decl.name (ast-func-ref.func target)) arg-regs))))))))
 
 (defmethod gast.emit ((a ast-binop-aref))
   (with-slots (left right) a
@@ -122,6 +123,20 @@ the assignment instructions replaced by PHI instructions to make it SSA.
        (unwind-protect
             (progn ,@body)
          (setf (state.lex-vars *state*) ,old-scope%)))))
+
+(defmethod gast.emit ((a ast-while))
+  (with-slots (condition body) a
+    (let+ (((cond-res cond-il) (gast.emit condition))
+           (body-ils (loop for elem in body collect (second (gast.emit elem))))
+           (skip-body (ix-il:jump-target))
+           (loopback (ix-il:jump-target)))
+      (list nil (list
+                 loopback
+                 cond-il
+                 (ix-il:jumpc cond-res := (ix-il:i 0) skip-body)
+                 body-ils
+                 (ix-il:jump loopback)
+                 skip-body)))))
 
 (defmethod gast.emit ((a ast-let))
   (with-slots (bindings body) a
