@@ -20,6 +20,11 @@
             :initarg :members
             :accessor hltype-union.members)))
 
+(defun agg-lookup-member (members member-name)
+  (loop for member in members do
+       (when (eq (hltype-agg-member.name member) member-name)
+         (return member))))
+
 (defclass hltype-builtin (hltype)
   ((signed-p :type boolean :initarg :signed-p :accessor hltype-builtin.signed-p)
    (float-p  :type boolean :initarg :float-p  :accessor hltype-builtin.float-p)
@@ -182,6 +187,28 @@
 
 (defmethod remove-cv ((x typespec))
   x)
+
+(defun deduplicate-cv (ts &optional has-const has-volatile)
+  (ematch ts
+    ((class typespec-const ref)
+     (if has-const
+         (deduplicate-cv ref has-const has-volatile)
+         (make-instance 'typespec-const :ref (deduplicate-cv ref t has-volatile))))
+    ((class typespec-volatile ref)
+     (if has-volatile
+         (deduplicate-cv ref has-const has-volatile)
+         (make-instance 'typespec-volatile :ref (deduplicate-cv ref has-const t))))
+    (x x)))
+
+(defun propagate-cv (a b)
+  "Return a new TYPESPEC that is the same as B but that also has the
+   cv-qualifiers that A has."
+  (ematch a
+    ((class typespec-const ref)
+     (make-instance 'typespec-const :ref (propagate-cv ref b)))
+    ((class typespec-volatile ref)
+     (make-instance 'typespec-volatile :ref (propagate-cv ref b)))
+    (x x)))
 
 (defun is-numeric (x)
   (ematch x

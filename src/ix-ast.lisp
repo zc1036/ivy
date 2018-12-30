@@ -44,6 +44,13 @@
    (right :type gast     :initarg :right :accessor ast-binop.right)
    (opstr :type string   :initarg :opstr :accessor ast-binop.opstr)
    (type  :type typespec :initarg :type  :accessor ast.type)))
+
+(defclass ast-binop-mbracc (ast)
+  ((left  :type gast     :initarg :left :accessor ast-binop-mbr.left)
+   (right :type symbol   :initarg :left :accessor ast-binop-mbr.right)
+   (type  :type typespec :initarg :type :accessor ast-binop-mbr.type))
+  (:documentation
+   "An AST node for structure/union member access"))
  
 (defclass ast-let (ast)
   ((bindings :type (list-of decl-var-binding) :initarg :bindings :accessor ast-let.bindings)
@@ -57,7 +64,7 @@
 
 (defmethod ast.type ((x ast-funcall))
   (let ((target-type (remove-cv (ast.type (ast-funcall.target x)))))
-    (match target-type
+    (ematch target-type
       ((class typespec-function ret-type)
        ret-type)
       (_ (error "Cannot determine type for function call")))))
@@ -129,6 +136,7 @@
        (is-numeric btype-nocv)))
 
 (defun aref-type-result (atype-nocv btype-nocv)
+  (declare (ignore btype-nocv))
   (ematch atype-nocv
     ((typespec-pointer ref) ref)
     ((typespec-array elt-type) elt-type)))
@@ -156,11 +164,41 @@
 
 (define-nary-syntax-by-binary ix-hll-kw:= binop-= :right)
 
+(defun mbr (obj member)
+  (check-type member symbol)
+
+  (let+ ((type (gast.type obj))
+         (type-nocv (remove-cv (gast.type obj)))
+         ((members name type-name)
+          (ematch type-nocv
+            ((class typespec-atom (ref (class hltype-structure struct-name members)))
+             (list members struct-name "struct"))
+            ((class typespec-atom (ref (class hltype-union union-name members)))
+             (list members union-name "union")))))
+    (let ((mbr-info (agg-lookup-member members member)))
+      (unless mbr-info
+        (error "Member ~a not present in ~a ~a" member type-name name))
+      (make-instance 'ast-binop-mbracc
+                     :left obj
+                     :right member
+                     :type (deduplicate-cv (propagate-cv type (hltype-agg-member.type mbr-info)))))))
+
+(defun make-member-access-ast (a b &rest rest)
+  (ematch b
+    (((quote var))
+     RESUME HERE
+     `(,a ))))
+
+(defun member-access-syntax (stream char)
+  (declare (ignore char))
+
+  (apply #'make-member-access-ast (read-delimited-list #\] stream t)))
+
 ;;; hll struct definition
 
 (defun process-struct-members (mbrs)
   (loop for mbr in mbrs collect
-       (match mbr
+       (ematch mbr
          ((list name type)
           (unless (symbolp name)
             (error "Invalid structure member name ~a" name))

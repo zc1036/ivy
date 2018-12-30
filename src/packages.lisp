@@ -25,7 +25,7 @@
   (:use :cl :ix-util :ix-state :ix-arch :optima)
   (:export
    :hltype :hltype.name
-   :hltype-agg-member :hltype-agg-member.name :hltype-agg-member.type
+   :hltype-agg-member :hltype-agg-member.name :hltype-agg-member.type :agg-lookup-member
    :hltype-structure :hltype-astructure.members
    :hltype-union :hltype-union.members
    :hltype-builtin :hltype-builtin.signed-p :hltype-builtin.float-p :hltype-builtin.bytesize :hltype-builtin.numeric
@@ -38,7 +38,7 @@
    :typespec-function :typespec-function.ret-type :typespec-function.arg-types
    :typespec.sizeof :typespec.alignof
    :hltype.sizeof :hltype.alignof
-   :remove-cv :typespec-equalp :is-numeric :const-p
+   :remove-cv :propagate-cv :deduplicate-cv :typespec-equalp :is-numeric :const-p 
 
    ;; slots
    :name :ret-type :type :members :signed-p :float-p :bytesize :numeric :ref :elt-type :size :arg-types))
