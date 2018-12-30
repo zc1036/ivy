@@ -129,6 +129,16 @@
           (format result "~a}" (indent)))))
     result))
 
+(defmethod gast.emit ((a ast-while))
+  (with-output-to-string (result)
+    (with-slots (condition body) a
+      (format result "while (~a) {~%" (gast.emit condition))
+      (let ((body-emissions (mapcar #'gast.emit body)))
+        (new-indent
+         (loop for emission in body-emissions do
+              (format result "~a~a;~%" (indent) emission)))
+        (format result "~a}" (indent))))))
+
 (defun emit-decl (decl)
   (with-slots (name ret-type args body-src body) decl
     (with-lexical-scope args
