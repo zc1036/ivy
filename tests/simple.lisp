@@ -1,6 +1,6 @@
 
 (defstruct foo
-  (hi int32))
+  (hi (& int16)))
 
 (defun blah int16 ((face int32) (face2 int32))
        (while face
@@ -9,5 +9,5 @@
        (let ((x int32 (+ face2 face 45)))
          (= face x)))
 
-(defun berp int32 ((face int32) (asdf int16) (arr (& int32)))
-       (+ asdf (blah 2 (aref arr asdf))))
+(defun berp int32 ((face (& (& (& (struct foo))))) (asdf int16) (arr (& int32)))
+       (+ [ face 1 2 3 'hi 4 ] asdf (blah 2 (aref arr asdf))))

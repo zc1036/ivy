@@ -30,9 +30,12 @@
            (push arg sources))))
       (pop argv))
 
+    (set-macro-character #\[ #'member-access-syntax t)
+
     (loop for arg in sources do
          (let ((*state* (make-state)))
            (format t "Compiling ~a~%~%" arg)
+
            (let ((*package* (find-package 'ix-hll-user)))
              (load arg))
 

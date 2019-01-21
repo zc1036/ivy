@@ -1,2 +1,4 @@
 
 language features as libraries
+
+need to make all macros take the &whole argument and save the source code for errors

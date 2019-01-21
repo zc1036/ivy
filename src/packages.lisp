@@ -25,7 +25,7 @@
   (:use :cl :ix-util :ix-state :ix-arch :optima)
   (:export
    :hltype :hltype.name
-   :hltype-agg-member :hltype-agg-member.name :hltype-agg-member.type :agg-lookup-member
+   :hltype-agg-member :hltype-agg-member.name :hltype-agg-member.type :agg-lookup-member :make-hltype-agg-member
    :hltype-structure :hltype-astructure.members
    :hltype-union :hltype-union.members
    :hltype-builtin :hltype-builtin.signed-p :hltype-builtin.float-p :hltype-builtin.bytesize :hltype-builtin.numeric
@@ -55,10 +55,14 @@
    :decl-variable :decl-variable.type :decl-variable.storage
    :ast-var-ref :ast-var-ref.var
    :ast-func-ref :ast-func-ref.func
+   :ast-unop :ast-unop.operand :ast-unop.opstr
+   :ast-unop-deref
    :ast-binop :ast-binop.left :ast-binop.right :ast-binop.opstr
+   :ast-binop-mbracc :ast-binop-mbracc.left :ast-binop-mbracc.right :ast-binop-mbracc.type
    :ast-let :ast-let.bindings :ast-let.body
    :ast.type :gast.type
    :binop-+ :ast-binop-+ :binop-- :ast-binop-- :ast-binop-= :binop-= :binop-aref :ast-binop-aref
+   :member-access-syntax
    :ast-while
    :lvalue-p
 
@@ -75,6 +79,7 @@
    :int16 :int32
    :+ :- :=
    :aref
+   :$ :$$ :$$$ :$$$$
    :let))
 
 (defpackage :ix-hll

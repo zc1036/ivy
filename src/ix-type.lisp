@@ -61,7 +61,14 @@
 (defgeneric typespec.to-string (typespec))
 
 (defmethod typespec.to-string ((ts typespec-atom))
-  (format nil "~a" (hltype.name (typespec-atom.ref ts))))
+  (let ((ref (typespec-atom.ref ts)))
+    (etypecase ref
+      (hltype-union
+       (format nil "(union ~a)" (hltype.name ref)))
+      (hltype-structure
+       (format nil "(struct ~a)" (hltype.name ref)))
+      (t
+       (format nil "~a" (hltype.name ref))))))
 
 (defmethod typespec.to-string ((ts typespec-const))
   (format nil "(const ~a)" (typespec.to-string (typespec-const.ref ts))))
@@ -198,7 +205,7 @@
      (if has-volatile
          (deduplicate-cv ref has-const has-volatile)
          (make-instance 'typespec-volatile :ref (deduplicate-cv ref has-const t))))
-    (x x)))
+    (_ ts)))
 
 (defun propagate-cv (a b)
   "Return a new TYPESPEC that is the same as B but that also has the
@@ -208,7 +215,7 @@
      (make-instance 'typespec-const :ref (propagate-cv ref b)))
     ((class typespec-volatile ref)
      (make-instance 'typespec-volatile :ref (propagate-cv ref b)))
-    (x x)))
+    (_ b)))
 
 (defun is-numeric (x)
   (ematch x

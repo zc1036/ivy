@@ -39,6 +39,11 @@
   ((func :type decl-function :initarg :func :accessor ast-func-ref.func)
    (type :type typespec      :initarg :type :accessor ast.type)))
 
+(defclass ast-unop (ast)
+  ((operand :type gast     :initarg :operand :accessor ast-unop.operand)
+   (opstr   :type string   :initarg :opstr   :accessor ast-unop.opstr)
+   (type    :type typespec :initarg :type    :accessor ast.type)))
+
 (defclass ast-binop (ast)
   ((left  :type gast     :initarg :left  :accessor ast-binop.left)
    (right :type gast     :initarg :right :accessor ast-binop.right)
@@ -46,9 +51,9 @@
    (type  :type typespec :initarg :type  :accessor ast.type)))
 
 (defclass ast-binop-mbracc (ast)
-  ((left  :type gast     :initarg :left :accessor ast-binop-mbr.left)
-   (right :type symbol   :initarg :left :accessor ast-binop-mbr.right)
-   (type  :type typespec :initarg :type :accessor ast-binop-mbr.type))
+  ((left  :type gast     :initarg :left  :accessor ast-binop-mbracc.left)
+   (right :type symbol   :initarg :right :accessor ast-binop-mbracc.right)
+   (type  :type typespec :initarg :type  :accessor ast-binop-mbracc.type))
   (:documentation
    "An AST node for structure/union member access"))
  
@@ -85,9 +90,11 @@
   ix-hll-kw:int32)
 
 (defun lvalue-p (a)
-  (typecase a
+  (etypecase a
     (ast-var-ref t)
-    (ast-binop-aref t)))
+    (ast-binop-aref t)
+    (ast-unop-deref t)
+    (t nil)))
 
 ;;; hll operators
 
@@ -145,6 +152,28 @@
 (define-binary-operator-with-nary-syntax "-"    :left binop--    ast-binop--    ix-hll-kw:-    numeric-binop-type-check numeric-type-result)
 (define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ix-hll-kw:aref aref-type-check aref-type-result)
 
+(defclass ast-unop-deref (ast-unop)
+  ((opstr :initform "$")))
+
+(defun ix-hll-kw:$ (opnd)
+  (let ((type (gast.type opnd)))
+    (ematch type
+      ((class typespec-pointer ref)
+       (make-instance 'ast-unop-deref
+                      :operand opnd
+                      :type ref))
+      (_
+       (error "Object is not a pointer")))))
+
+(defun ix-hll-kw:$$ (opnd)
+  (ix-hll-kw:$ (ix-hll-kw:$ opnd)))
+
+(defun ix-hll-kw:$$$ (opnd)
+  (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ opnd))))
+
+(defun ix-hll-kw:$$$$ (opnd)
+  (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ opnd)))))
+
 (defclass ast-binop-= (ast-binop)
   ((opstr :initform "=")))
 
@@ -168,13 +197,15 @@
   (check-type member symbol)
 
   (let+ ((type (gast.type obj))
-         (type-nocv (remove-cv (gast.type obj)))
+         (type-nocv (remove-cv type))
          ((members name type-name)
           (ematch type-nocv
-            ((class typespec-atom (ref (class hltype-structure struct-name members)))
-             (list members struct-name "struct"))
-            ((class typespec-atom (ref (class hltype-union union-name members)))
-             (list members union-name "union")))))
+            ((class typespec-atom (ref (class hltype-structure name members)))
+             (list members name "struct"))
+            ((class typespec-atom (ref (class hltype-union name members)))
+             (list members name "union"))
+            (_
+             (error "Object of type ~a is not a struct or union" (typespec.to-string type))))))
     (let ((mbr-info (agg-lookup-member members member)))
       (unless mbr-info
         (error "Member ~a not present in ~a ~a" member type-name name))
@@ -183,13 +214,34 @@
                      :right member
                      :type (deduplicate-cv (propagate-cv type (hltype-agg-member.type mbr-info)))))))
 
-(defun make-member-access-ast (a b &rest rest)
+(defun deref-mbr (obj member)
+  (let* ((type (gast.type obj))
+         (type-nocv (remove-cv type)))
+    (ematch type-nocv
+      ((class typespec-pointer ref)
+       (deref-mbr (ix-hll-kw:$ obj) member))
+      (_
+       (mbr obj member)))))
+
+(defun make-member-access-ast (a &optional b &rest rest)
   (ematch b
-    (((quote var))
-     RESUME HERE
-     `(,a ))))
+    ((list 'quote x)
+     (if rest
+         (apply #'make-member-access-ast (cons `(deref-mbr ,a ,b) rest))
+         `(deref-mbr ,a ,b)))
+    (var
+     (if rest
+         (apply #'make-member-access-ast (cons `(ix-hll-kw:aref ,a ,b) rest))
+         `(ix-hll-kw:aref ,a ,b)))))
 
 (defun member-access-syntax (stream char)
+  "We want things like
+    [array 1]
+    [array idx]
+    [struct'mbr]
+    [ptr_to_struct'mbr]
+    [(func) 'mbr1'mbr2 idx (+ 1 2)]
+   to work."
   (declare (ignore char))
 
   (apply #'make-member-access-ast (read-delimited-list #\] stream t)))
@@ -203,25 +255,30 @@
           (unless (symbolp name)
             (error "Invalid structure member name ~a" name))
           (unless (typep type 'typespec)
-            (error "Invalid structure member type ~a" type)))
+            (error "Invalid structure member type ~a" type))
+          (make-hltype-agg-member :name name :type type))
          (_ (error "Invalid structure member specification ~a" mbr)))))
 
 (defun make-struct-member-specs (mbrs)
   (loop for mbr in mbrs collect
        `(list ',(car mbr) ,@(cdr mbr))))
 
-(defmacro ix-hll-kw:struct (&body body)
-  `(make-instance 'hltype-structure
-                  :name (gensym "STRUCT")
-                  :members (process-struct-members
-                            (list ,@(make-struct-member-specs body)))))
+(defun ix-hll-kw:struct (s)
+  (unless (typep s 'hltype-structure)
+    (error "~a is not a structure" s))
+
+  (make-instance 'typespec-atom :ref s))
 
 (defmacro ix-hll-kw:defstruct (name &body body)
   `(progn
      (defvar ,name nil)
      (when ,name
        (error "Defining structure ~a: name already defined" ',name))
-     (setf ,name (ix-hll-kw:struct ,@body))
+     (setf ,name
+           (make-instance 'hltype-structure
+                          :name (gensym "STRUCT")
+                          :members (process-struct-members
+                                    (list ,@(make-struct-member-specs body)))))
      (setf (hltype.name ,name) ',name)))
 
 ;;; LET form

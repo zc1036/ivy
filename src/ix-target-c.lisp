@@ -10,11 +10,21 @@
   `(let ((*indent* (+ *indent* 2)))
      ,@body))
 
+(defun hltype.to-c-string (hlt)
+  (let ((name (hltype.name hlt)))
+    (etypecase hlt
+      (hltype-structure
+       (format nil "struct ~a" name))
+      (hltype-union
+       (format nil "union ~a" name))
+      (hltype-builtin
+       name))))
+
 (defgeneric typespec.to-c-string* (td name &optional extra))
 
 (defmethod typespec.to-c-string* ((td typespec-atom) name &optional extra)
   extra
-  (format nil "~a~a~a" (hltype.name (typespec-atom.ref td)) (if (= (length name) 0) "" " ") name))
+  (format nil "~a~a~a" (hltype.to-c-string (typespec-atom.ref td)) (if (= (length name) 0) "" " ") name))
 
 (defmethod typespec.to-c-string* ((td typespec-pointer) name &optional extra)
   extra
@@ -101,6 +111,15 @@
   (format nil "(~a(~{~a~^, ~}))"
           (gast.emit (ast-funcall.target a))
           (mapcar #'gast.emit (ast-funcall.args a))))
+
+(defmethod gast.emit ((a ast-binop-mbracc))
+  (format nil "(~a.~a)"
+          (gast.emit (ast-binop-mbracc.left a))
+          (ast-binop-mbracc.right a)))
+
+(defmethod gast.emit ((a ast-unop-deref))
+  (format nil "(* ~a)"
+          (gast.emit (ast-unop.operand a))))
 
 (defmacro with-lexical-scope (bindings &body body)
   ;;; given BINDINGS :: (list-of decl-var-binding), evaluates BODY in a new
