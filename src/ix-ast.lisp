@@ -150,7 +150,7 @@
 
 (define-binary-operator-with-nary-syntax "+"    :left binop-+    ast-binop-+    ix-hll-kw:+    numeric-binop-type-check numeric-type-result)
 (define-binary-operator-with-nary-syntax "-"    :left binop--    ast-binop--    ix-hll-kw:-    numeric-binop-type-check numeric-type-result)
-(define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ix-hll-kw:aref aref-type-check aref-type-result)
+(define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ix-hll-kw:aref aref-type-check          aref-type-result)
 
 (defclass ast-unop-deref (ast-unop)
   ((opstr :initform "$")))
@@ -246,7 +246,7 @@
 
   (apply #'make-member-access-ast (read-delimited-list #\] stream t)))
 
-;;; hll struct definition
+;;; hll struct/union definition
 
 (defun process-struct-members (mbrs)
   (loop for mbr in mbrs collect
@@ -276,6 +276,18 @@
        (error "Defining structure ~a: name already defined" ',name))
      (setf ,name
            (make-instance 'hltype-structure
+                          :name (gensym "STRUCT")
+                          :members (process-struct-members
+                                    (list ,@(make-struct-member-specs body)))))
+     (setf (hltype.name ,name) ',name)))
+
+(defmacro ix-hll-kw:defunion (name &body body)
+  `(progn
+     (defvar ,name nil)
+     (when ,name
+       (error "Defining union ~a: name already defined" ',name))
+     (setf ,name
+           (make-instance 'hltype-union
                           :name (gensym "STRUCT")
                           :members (process-struct-members
                                     (list ,@(make-struct-member-specs body)))))

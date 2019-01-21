@@ -2,3 +2,5 @@
 language features as libraries
 
 need to make all macros take the &whole argument and save the source code for errors
+
+fix the reader to allow lists in the function position like ((hello) a b c)
