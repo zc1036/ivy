@@ -288,7 +288,7 @@
        (error "Defining union ~a: name already defined" ',name))
      (setf ,name
            (make-instance 'hltype-union
-                          :name (gensym "STRUCT")
+                          :name (gensym "UNION")
                           :members (process-struct-members
                                     (list ,@(make-struct-member-specs body)))))
      (setf (hltype.name ,name) ',name)))
