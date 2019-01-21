@@ -156,7 +156,7 @@
   ((opstr :initform "$")))
 
 (defun ix-hll-kw:$ (opnd)
-  (let ((type (gast.type opnd)))
+  (let ((type (remove-cv (gast.type opnd))))
     (ematch type
       ((class typespec-pointer ref)
        (make-instance 'ast-unop-deref
