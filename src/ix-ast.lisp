@@ -269,29 +269,23 @@
 
   (make-instance 'typespec-atom :ref s))
 
-(defmacro ix-hll-kw:defstruct (name &body body)
+(defun define-aggregate-type (name hltype pretty-name gensym-prefix body)
   `(progn
      (defvar ,name nil)
      (when ,name
-       (error "Defining structure ~a: name already defined" ',name))
+       (error "Defining ~a ~a: name already defined" ,pretty-name ',name))
      (setf ,name
-           (make-instance 'hltype-structure
-                          :name (gensym "STRUCT")
+           (make-instance ',hltype
+                          :name (gensym ,gensym-prefix)
                           :members (process-struct-members
                                     (list ,@(make-struct-member-specs body)))))
      (setf (hltype.name ,name) ',name)))
 
+(defmacro ix-hll-kw:defstruct (name &body body)
+  (define-aggregate-type name 'hltype-structure "structure" "STRUCT" body))
+
 (defmacro ix-hll-kw:defunion (name &body body)
-  `(progn
-     (defvar ,name nil)
-     (when ,name
-       (error "Defining union ~a: name already defined" ',name))
-     (setf ,name
-           (make-instance 'hltype-union
-                          :name (gensym "UNION")
-                          :members (process-struct-members
-                                    (list ,@(make-struct-member-specs body)))))
-     (setf (hltype.name ,name) ',name)))
+  (define-aggregate-type name 'hltype-union "union" "UNION" body))
 
 ;;; LET form
 
