@@ -74,7 +74,7 @@
   (:export
    :function :array :const :vltl :&
    :fun :struct
-   :defun :defstruct
+   :defun :defstruct :defunion
    :while
    :int16 :int32
    :+ :- :=
