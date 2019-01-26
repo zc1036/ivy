@@ -294,7 +294,8 @@
                           :name (gensym ,gensym-prefix)
                           :members (process-struct-members
                                     (list ,@(make-struct-member-specs body)))))
-     (setf (hltype.name ,name) ',name)))
+     (setf (hltype.name ,name) ',name)
+     (push ,name (state.emittables *state*))))
 
 (defmacro ix-hll-kw:defstruct (name &body body)
   (define-aggregate-type name 'hltype-structure "structure" "STRUCT" body))
@@ -407,7 +408,7 @@
        (let* ((,ret-type% ,ret-type)
               (,fn% (ix-hll-kw:fun ,ret-type% ,args ,@body)))
          (setf (decl.name ,fn%) ',name)
-         (push ,fn% (state.functions *state*))
+         (push ,fn% (state.emittables *state*))
          ;; we do this here rather than moving the setf of ,name down here
          ;; because in the case of recursive functions, we want them to be able
          ;; to grab a reference to themselves before that reference is filled
@@ -418,4 +419,4 @@
                               :arg-types (mapcar #'decl-var-binding.type
                                                  (decl-function.args ,fn%))))
          (setf (ast-func-ref.func ,name)
-               (car (state.functions *state*)))))))
+               (car (state.emittables *state*)))))))

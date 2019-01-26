@@ -18,7 +18,7 @@
   (:use :cl :ix-util :ix-arch)
   (:export
    :lexical-scope :make-lexical-scope :lexical-scope.bindings :lexical-scope.next :lexical-scope.lookup
-   :state :make-state :state.functions :state.lex-vars :state.glob-vars :state.lookup-lexical-var
+   :state :make-state :state.emittables :state.lex-vars :state.glob-vars :state.lookup-lexical-var
    :*state* :*target-arch*))
 
 (defpackage :ix-type
@@ -26,7 +26,7 @@
   (:export
    :hltype :hltype.name
    :hltype-agg-member :hltype-agg-member.name :hltype-agg-member.type :agg-lookup-member :make-hltype-agg-member
-   :hltype-structure :hltype-astructure.members
+   :hltype-structure :hltype-structure.members
    :hltype-union :hltype-union.members
    :hltype-builtin :hltype-builtin.signed-p :hltype-builtin.float-p :hltype-builtin.bytesize :hltype-builtin.numeric
    :typespec :typespec.to-string
@@ -92,8 +92,8 @@
 
 (defpackage :ix-target-il
   (:use :cl :ix-util :ix-ast :ix-state :ix-type :optima)
-  (:export :emit-decl))
+  (:export :emit))
 
 (defpackage :ix-target-c
   (:use :cl :ix-util :ix-ast :ix-state :ix-type)
-  (:export :emit-decl))
+  (:export :emit))

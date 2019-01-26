@@ -5,15 +5,15 @@
 
 ;;; main program
 
-(defparameter *target* #'ix-target-il:emit-decl)
+(defparameter *target* #'ix-target-il:emit)
 
 (defun target-string-to-target (target)
   (let ((target (string-upcase target)))
     (cond
       ((string= target "C")
-       (setf *target* #'ix-target-c:emit-decl))
+       (setf *target* #'ix-target-c:emit))
       ((string= target "IL")
-       (setf *target* #'ix-target-il:emit-decl))
+       (setf *target* #'ix-target-il:emit))
       (t
        (error "No target by the name of ~a exists" target)))))
 
@@ -39,7 +39,11 @@
            (let ((*package* (find-package 'ix-hll-user)))
              (load arg))
 
-           (loop for func in (reverse (state.functions *state*)) do
-                (format t "Function ~a:~%" (decl.name func))
+           (loop for emittable in (reverse (state.emittables *state*)) do
+                (etypecase emittable
+                  (decl-function
+                   (format t "Function ~a:~%" (decl.name emittable)))
+                  ((or hltype-structure hltype-union)
+                   (format t "Aggregate ~a:~%" (hltype.name emittable))))
 
-                (funcall *target* func))))))
+                (funcall *target* emittable))))))

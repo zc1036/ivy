@@ -17,9 +17,9 @@
           (lexical-scope.lookup (lexical-scope.next scope) var)))))
 
 (defstruct (state (:conc-name state.))
-  (functions nil :type (list-of decl-function))
-  (lex-vars  nil :type (or null lexical-scope))
-  (glob-vars nil :type list)) ;; alist map of decl-variables to some             
+  (emittables nil :type (list-of (or decl-function hltype-structure hltype-union)))
+  (lex-vars   nil :type (or null lexical-scope))
+  (glob-vars  nil :type list)) ;; alist map of decl-variables to some             
                               ;; target-specific thing (ix-il:reg when targetting
                               ;; IL, etc)                                        
 

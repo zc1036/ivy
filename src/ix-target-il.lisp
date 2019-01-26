@@ -168,7 +168,7 @@ the assignment instructions replaced by PHI instructions to make it SSA.
     (list (mapc #'print-instrs instrs))
     (ix-il:optr (format t "  ~a~%" (ix-il:optr.repr instrs)))))
 
-(defun emit-decl (decl)
+(defun emit (decl)
   (with-slots (ret-type args body-src body) decl
     (with-lexical-scope args
       (loop for elem in body for elem-src in body-src do

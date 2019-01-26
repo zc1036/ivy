@@ -9,5 +9,5 @@
        (let ((x int32 (+ face2 face 45)))
          (= face x)))
 
-(defun berp int32 ((face (& (& (& (struct foo))))) (asdf (const (& int16))) (arr (& int32)))
-       (+ [ face 1 2 3 'hi 4 ] ($ asdf) (blah 2 (aref arr ($ asdf))) (cast (& int16) 4)))
+(defun |main| int32 ((face (& (& (& (struct foo))))) (asdf (const (& int16))) (arr (& int32)))
+       (+ [ face 1 2 3 'hi 4 ] ($ asdf) (blah 2 (aref arr ($ asdf))) (cast int16 4)))

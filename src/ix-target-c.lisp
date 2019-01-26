@@ -148,8 +148,15 @@
         (let ((body-emissions (mapcar #'gast.emit body)))
           (format result "{~%")
           (new-indent
-           (loop for emission in body-emissions do
-                (format result "~a~a;~%" (indent) emission)))
+            (loop for binding in bindings do
+                 (with-slots (name type init) binding
+                   (format result "~a~a~a~a;~%"
+                           (indent)
+                           (typespec.to-c-string type (symbol-name name))
+                           (if init " = " "")
+                           (if init (gast.emit init) ""))))
+            (loop for emission in body-emissions do
+                 (format result "~a~a;~%" (indent) emission)))
           (format result "~a}" (indent)))))
     result))
 
@@ -159,11 +166,11 @@
       (format result "while (~a) {~%" (gast.emit condition))
       (let ((body-emissions (mapcar #'gast.emit body)))
         (new-indent
-         (loop for emission in body-emissions do
-              (format result "~a~a;~%" (indent) emission)))
+          (loop for emission in body-emissions do
+               (format result "~a~a;~%" (indent) emission)))
         (format result "~a}" (indent))))))
 
-(defun emit-decl (decl)
+(defun emit-function (decl)
   (with-slots (name ret-type args body-src body) decl
     (with-lexical-scope args
       (format t "~a {~%"
@@ -174,6 +181,23 @@
                name
                (mapcar #'decl-var-binding.name args)))
       (new-indent
-       (loop for elem in body for elem-src in body-src do
-            (format t "~a~a;~%" (indent) (gast.emit elem))))
+        (loop for elem in body for elem-src in body-src do
+             (format t "~a~a;~%" (indent) (gast.emit elem))))
       (format t "}~%"))))
+
+(defun emit-aggregate (aggtype agg members)
+  (format t "~a~a ~a {~%" (indent) aggtype (hltype.name agg))
+  (new-indent
+    (loop for member in members do
+         (format t "~a~a;~%" (indent) (typespec.to-c-string (hltype-agg-member.type member)
+                                                            (hltype-agg-member.name member)))))
+  (format t "~a};~%" (indent)))
+
+(defun emit (emittable)
+  (etypecase emittable
+    (decl-function
+     (emit-function emittable))
+    (hltype-structure
+     (emit-aggregate "struct" emittable (hltype-structure.members emittable)))
+    (hltype-union
+     (emit-aggregate "union" emittable (hltype-union.members emittable)))))
