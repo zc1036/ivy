@@ -56,7 +56,7 @@
    :ast-var-ref :ast-var-ref.var
    :ast-func-ref :ast-func-ref.func
    :ast-unop :ast-unop.operand :ast-unop.opstr
-   :ast-unop-deref
+   :ast-unop-deref :ast-unop-cast
    :ast-binop :ast-binop.left :ast-binop.right :ast-binop.opstr
    :ast-binop-mbracc :ast-binop-mbracc.left :ast-binop-mbracc.right :ast-binop-mbracc.type
    :ast-let :ast-let.bindings :ast-let.body
@@ -77,7 +77,8 @@
    :defun :defstruct :defunion
    :while
    :int16 :int32
-   :+ :- :=
+   :+ :- := :* :/
+   :cast
    :aref
    :$ :$$ :$$$ :$$$$
    :let))

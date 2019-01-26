@@ -10,4 +10,4 @@
          (= face x)))
 
 (defun berp int32 ((face (& (& (& (struct foo))))) (asdf (const (& int16))) (arr (& int32)))
-       (+ [ face 1 2 3 'hi 4 ] ($ asdf) (blah 2 (aref arr ($ asdf)))))
+       (+ [ face 1 2 3 'hi 4 ] ($ asdf) (blah 2 (aref arr ($ asdf))) (cast (& int16) 4)))

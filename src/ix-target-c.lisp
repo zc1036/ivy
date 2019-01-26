@@ -121,6 +121,11 @@
   (format nil "(* ~a)"
           (gast.emit (ast-unop.operand a))))
 
+(defmethod gast.emit ((a ast-unop-cast))
+  (format nil "((~a)~a)"
+          (typespec.to-c-string (ast.type a))
+          (gast.emit (ast-unop.operand a))))
+
 (defmacro with-lexical-scope (bindings &body body)
   ;;; given BINDINGS :: (list-of decl-var-binding), evaluates BODY in a new
   ;;; lexical context wherein each binding in BINDINGS is active.

@@ -41,13 +41,11 @@
 
 (defclass ast-unop (ast)
   ((operand :type gast     :initarg :operand :accessor ast-unop.operand)
-   (opstr   :type string   :initarg :opstr   :accessor ast-unop.opstr)
    (type    :type typespec :initarg :type    :accessor ast.type)))
 
 (defclass ast-binop (ast)
   ((left  :type gast     :initarg :left  :accessor ast-binop.left)
    (right :type gast     :initarg :right :accessor ast-binop.right)
-   (opstr :type string   :initarg :opstr :accessor ast-binop.opstr)
    (type  :type typespec :initarg :type  :accessor ast.type)))
 
 (defclass ast-binop-mbracc (ast)
@@ -111,7 +109,7 @@
 (defmacro define-binary-operator-with-nary-syntax (opstr assoc binop-fn-name binop-class-name nary-fn-name type-check type-result)
   `(progn
      (defclass ,binop-class-name (ast-binop)
-       ((opstr :initform ,opstr)))
+       ((opstr :type string :initform ,opstr :accessor ast-binop.opstr)))
 
      (defun ,binop-fn-name (a b)
        (let* ((a-type (gast.type a))
@@ -137,9 +135,10 @@
   atype-nocv)
 
 (defun aref-type-check (atype-nocv btype-nocv)
-  (and (or (typecase atype-nocv
+  (and (or (etypecase atype-nocv
              (typespec-pointer t)
-             (typespec-array t)))
+             (typespec-array t)
+             (t nil)))
        (is-numeric btype-nocv)))
 
 (defun aref-type-result (atype-nocv btype-nocv)
@@ -150,10 +149,12 @@
 
 (define-binary-operator-with-nary-syntax "+"    :left binop-+    ast-binop-+    ix-hll-kw:+    numeric-binop-type-check numeric-type-result)
 (define-binary-operator-with-nary-syntax "-"    :left binop--    ast-binop--    ix-hll-kw:-    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "*"    :left binop-*    ast-binop-*    ix-hll-kw:*    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "/"    :left binop-/    ast-binop-/    ix-hll-kw:/    numeric-binop-type-check numeric-type-result)
 (define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ix-hll-kw:aref aref-type-check          aref-type-result)
 
 (defclass ast-unop-deref (ast-unop)
-  ((opstr :initform "$")))
+  ((opstr :type string :initform "$" :accessor ast-unop.opstr)))
 
 (defun ix-hll-kw:$ (opnd)
   (let ((type (remove-cv (gast.type opnd))))
@@ -173,6 +174,20 @@
 
 (defun ix-hll-kw:$$$$ (opnd)
   (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ opnd)))))
+
+(defclass ast-unop-cast (ast-unop)
+  ())
+
+(defun ix-hll-kw:cast (cast-type expr)
+  (let ((expr-type-nocv (remove-cv (gast.type expr)))
+        (cast-type-nocv (remove-cv cast-type)))
+    (if (or (and (is-numeric cast-type-nocv) (is-numeric expr-type-nocv)) ;; allow arithmetic conversions
+            (and (typep expr-type-nocv 'typespec-pointer)                 ;; allow pointer conversions
+                 (typep cast-type-nocv 'typespec-pointer)))
+        (make-instance 'ast-unop-cast :operand expr :type cast-type)
+        (error "Cannot cast from ~a to ~a"
+               (typespec.to-string (gast.type expr))
+               (typespec.to-string cast-type)))))
 
 (defclass ast-binop-= (ast-binop)
   ((opstr :initform "=")))
@@ -217,19 +232,19 @@
 (defun deref-mbr (obj member)
   (let* ((type (gast.type obj))
          (type-nocv (remove-cv type)))
-    (ematch type-nocv
-      ((class typespec-pointer ref)
+    (etypecase type-nocv
+      (typespec-pointer
        (deref-mbr (ix-hll-kw:$ obj) member))
-      (_
+      (t
        (mbr obj member)))))
 
 (defun make-member-access-ast (a &optional b &rest rest)
   (ematch b
-    ((list 'quote x)
+    ((list 'quote _)
      (if rest
          (apply #'make-member-access-ast (cons `(deref-mbr ,a ,b) rest))
          `(deref-mbr ,a ,b)))
-    (var
+    (_
      (if rest
          (apply #'make-member-access-ast (cons `(ix-hll-kw:aref ,a ,b) rest))
          `(ix-hll-kw:aref ,a ,b)))))
