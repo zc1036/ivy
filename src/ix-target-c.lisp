@@ -134,7 +134,11 @@
             (,new-scope% (make-lexical-scope :next ,old-scope%)))
        (loop for ,binding% in ,bindings do
             (push (cons (decl-var-binding.name ,binding%)
-                        t) ;; (ix-il:r (typespec.sizeof (decl-var-binding.type ,binding%)) (decl-var-binding.name ,binding%))
+                        t) ;; while in the IL target we need some instance of a
+                           ;; register in the cdr position here, we don't need
+                           ;; it for C because we're not doing any register
+                           ;; allocation or anything.
+                           ;; (ix-il:r (typespec.sizeof (decl-var-binding.type ,binding%)) (decl-var-binding.name ,binding%))
                   (lexical-scope.bindings ,new-scope%)))
        (setf (state.lex-vars *state*) ,new-scope%)
        (unwind-protect
