@@ -28,8 +28,13 @@
 (defclass hltype-builtin (hltype)
   ((signed-p :type boolean :initarg :signed-p :accessor hltype-builtin.signed-p)
    (float-p  :type boolean :initarg :float-p  :accessor hltype-builtin.float-p)
-   (bytesize :type integer :initarg :bytesize :accessor hltype-builtin.bytesize)
+   (bytesize :type (or null integer) :initarg :bytesize)
    (numeric  :type boolean :initarg :numeric  :accessor hltype-builtin.numeric)))
+
+(defmethod hltype-builtin.bytesize (hltype)
+  (let ((bs (slot-value hltype 'bytesize)))
+    (or bs
+        (error "Type ~a has no size" (hltype.name hltype)))))
 
 ;; typespecs have structural equality
 
@@ -105,7 +110,7 @@
   (typespec.alignof (typespec-volatile.ref a)))
 
 (defmethod typespec.alignof ((a typespec-pointer))
-  (/ (arch.bits *target-arch*) 8))
+  (/ (platform.bits *target-platform*) 8))
 
 (defmethod typespec.alignof ((a typespec-array))
   (typespec.alignof (typespec-array.elt-type a)))
@@ -140,7 +145,7 @@
   (typespec.sizeof (typespec-volatile.ref a)))
 
 (defmethod typespec.sizeof ((a typespec-pointer))
-  (/ (arch.bits *target-arch*) 8))
+  (/ (platform.bits *target-platform*) 8))
 
 (defmethod typespec.sizeof ((a typespec-array))
   (with-slots (size elt-type) a
@@ -176,10 +181,13 @@
   (hltype-builtin.bytesize a))
 
 (defmethod hltype.sizeof ((a hltype-structure))
-  (let+ ((member-info (agg-member-type-size-offset-align (hltype-structure.members a)))
-         (struct-align (hltype.alignof a))
-         ((type size offset align) (last member-info)))
-    (progn type align (round-up-to-nearest (+ offset size) struct-align))))
+  (if (hltype-structure.members a)
+      (let+ ((member-info (agg-member-type-size-offset-align (hltype-structure.members a)))
+             (struct-align (hltype.alignof a))
+             ((type size offset align) (car (last member-info))))
+            (progn type align (round-up-to-nearest (+ offset size) struct-align)))
+      1 ;; empty structures are 1 byte big
+      ))
 
 (defmethod hltype.sizeof ((a hltype-union))
   (apply #'max (mapcar #'second (agg-member-type-size-offset-align (hltype-union.members a)))))
@@ -308,6 +316,15 @@
 
   (make-instance 'typespec-volatile :ref ref))
 
+(defvar hlts-char (make-instance 'hltype-builtin
+                                  :signed-p (platform.char-signed-p *target-platform*)
+                                  :float-p nil
+                                  :bytesize 1
+                                  :name :char
+                                  :numeric t))
+
+(defvar ix-hll-kw:char (make-instance 'typespec-atom :ref hlts-char))
+
 (defvar hlts-int32 (make-instance 'hltype-builtin
                                   :signed-p t
                                   :float-p nil
@@ -325,3 +342,21 @@
                                   :numeric t))
 
 (defvar ix-hll-kw:int16 (make-instance 'typespec-atom :ref hlts-int16))
+
+(defvar hlts-int8 (make-instance 'hltype-builtin
+                                  :signed-p t
+                                  :float-p nil
+                                  :bytesize 1
+                                  :name :int8
+                                  :numeric t))
+
+(defvar ix-hll-kw:int8 (make-instance 'typespec-atom :ref hlts-int8))
+
+(defvar hlts-void (make-instance 'hltype-builtin
+                                 :signed-p nil
+                                 :float-p nil
+                                 :bytesize nil
+                                 :name :void
+                                 :numeric nil))
+
+(defvar ix-hll-kw:void (make-instance 'typespec-atom :ref hlts-void))

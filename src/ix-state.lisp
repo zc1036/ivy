@@ -27,5 +27,6 @@
   (lexical-scope.lookup (state.lex-vars state) var))
 
 (defparameter *state* nil)
-(defparameter *target-arch* (make-arch :name "x86-64"
-                                       :bits 64))
+(defparameter *target-platform* (make-platform :name "Linux x86-64"
+                                               :bits 64
+                                               :char-signed-p t))

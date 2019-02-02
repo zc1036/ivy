@@ -10,19 +10,19 @@
            :reg.name :reg.bytesize :imm.value :imm.bytesize
            :with-reg))
 
-(defpackage :ix-arch
+(defpackage :ix-platform
   (:use :cl)
-  (:export :arch :arch.bits :make-arch))
+  (:export :platform :platform.bits :platform.char-signed-p :platform.name :make-platform))
 
 (defpackage :ix-state
-  (:use :cl :ix-util :ix-arch)
+  (:use :cl :ix-util :ix-platform)
   (:export
    :lexical-scope :make-lexical-scope :lexical-scope.bindings :lexical-scope.next :lexical-scope.lookup
    :state :make-state :state.emittables :state.lex-vars :state.glob-vars :state.lookup-lexical-var
-   :*state* :*target-arch*))
+   :*state* :*target-platform*))
 
 (defpackage :ix-type
-  (:use :cl :ix-util :ix-state :ix-arch :optima)
+  (:use :cl :ix-util :ix-state :ix-platform :optima)
   (:export
    :hltype :hltype.name
    :hltype-agg-member :hltype-agg-member.name :hltype-agg-member.type :agg-lookup-member :make-hltype-agg-member
@@ -38,13 +38,15 @@
    :typespec-function :typespec-function.ret-type :typespec-function.arg-types
    :typespec.sizeof :typespec.alignof
    :hltype.sizeof :hltype.alignof
-   :remove-cv :propagate-cv :deduplicate-cv :typespec-equalp :is-numeric :const-p 
+   :remove-cv :propagate-cv :deduplicate-cv :typespec-equalp :is-numeric :const-p
+
+   :hlts-char :hlts-int8 :hlts-int16 :hlts-int32 :hlts-void
 
    ;; slots
    :name :ret-type :type :members :signed-p :float-p :bytesize :numeric :ref :elt-type :size :arg-types))
 
 (defpackage :ix-ast
-  (:use :cl :ix-util :optima :ix-arch :ix-type :ix-state)
+  (:use :cl :ix-util :optima :ix-platform :ix-type :ix-state)
   (:export
    :ast :ast.type
    :gast
@@ -76,7 +78,7 @@
    :fun :struct
    :defun :defstruct :defunion
    :while
-   :int16 :int32
+   :char :int16 :int32 :int8 :void
    :+ :- := :* :/
    :cast
    :aref
@@ -84,7 +86,7 @@
    :let))
 
 (defpackage :ix-hll
-  (:use :cl :optima :ix-util :ix-arch :ix-ast :ix-type :ix-state)
+  (:use :cl :optima :ix-util :ix-platform :ix-ast :ix-type :ix-state)
   (:export :main))
 
 (defpackage :ix-hll-user

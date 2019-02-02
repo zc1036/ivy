@@ -134,10 +134,17 @@
   (declare (ignore btype-nocv))
   atype-nocv)
 
+(defun is-void-maybe-cv (x)
+  (eq hlts-void (remove-cv x)))
+
 (defun aref-type-check (atype-nocv btype-nocv)
   (and (or (etypecase atype-nocv
-             (typespec-pointer t)
-             (typespec-array t)
+             (typespec-pointer
+              (and (typespec.sizeof (typespec-pointer.ref atype-nocv))
+                   t))
+             (typespec-array
+              (and (typespec.sizeof (typespec-array.elt-type atype-nocv))
+                   t))
              (t nil)))
        (is-numeric btype-nocv)))
 
@@ -371,11 +378,24 @@
 
 ;;; hll function definition
 
+(defun check-fun-args (args &key has-variadic)
+  (if args
+      (let ((arg (car args)))
+        (if (eq '&rest arg)
+          (if has-variadic
+              (error "Function already declared as variadic")
+              (check-fun-args (cdr args) :has-variadic t))
+          (if has-variadic
+              (error "Function parameters can't come after &rest")
+              (if (= 2 (length arg))
+                  (check-fun-args (cdr args))
+                  (error "Malformed function parameter")))))
+      t))
+
 (defmacro ix-hll-kw:fun (ret-type args &body body)
   (let ((types% (gensym "TYPES"))
         (names (mapcar #'car args)))
-    (when (not (every (lambda (x) (= (length x) 2))
-                    args))
+    (when (not (check-fun-args args))
       (error "Malformed argument list ~a" args))
     `(let ((,types% (list ,@(mapcar #'cadr args))))
        ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% nil)

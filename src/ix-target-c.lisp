@@ -177,7 +177,7 @@
 (defun emit-function (decl)
   (with-slots (name ret-type args body-src body) decl
     (with-lexical-scope args
-      (format t "~a {~%"
+      (format t "static ~a {~%"
               (typespec.to-c-string*
                (make-instance 'typespec-function
                               :ret-type ret-type
