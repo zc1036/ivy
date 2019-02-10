@@ -127,13 +127,13 @@
           (gast.emit (ast-unop.operand a))))
 
 (defmacro with-lexical-scope (bindings &body body)
-  ;;; given BINDINGS :: (list-of decl-var-binding), evaluates BODY in a new
+  ;;; given BINDINGS :: (list-of (pair (symbol decl-variable))), evaluates BODY in a new
   ;;; lexical context wherein each binding in BINDINGS is active.
   (with-gensyms (old-scope% new-scope% binding%)
     `(let* ((,old-scope% (state.lex-vars *state*))
             (,new-scope% (make-lexical-scope :next ,old-scope%)))
        (loop for ,binding% in ,bindings do
-            (push (cons (decl-var-binding.name ,binding%)
+            (push (cons (car ,binding%)
                         t) ;; while in the IL target we need some instance of a
                            ;; register in the cdr position here, we don't need
                            ;; it for C because we're not doing any register
@@ -152,8 +152,8 @@
         (let ((body-emissions (mapcar #'gast.emit body)))
           (format result "{~%")
           (new-indent
-            (loop for binding in bindings do
-                 (with-slots (name type init) binding
+            (loop for (name . vardecl) in bindings do
+                 (with-slots (type init) vardecl
                    (format result "~a~a~a~a;~%"
                            (indent)
                            (typespec.to-c-string type (symbol-name name))
@@ -164,15 +164,23 @@
           (format result "~a}" (indent)))))
     result))
 
+(defmethod gast.emit ((a ast-do))
+  (with-output-to-string (result)
+    (with-slots (condition body) a
+      (format result "{~%")
+      (new-indent
+       (loop for emission in (mapcar #'gast.emit body) do
+            (format result "~a~a;~%" (indent) emission)))
+      (format result "~a}" (indent)))))
+
 (defmethod gast.emit ((a ast-while))
   (with-output-to-string (result)
     (with-slots (condition body) a
       (format result "while (~a) {~%" (gast.emit condition))
-      (let ((body-emissions (mapcar #'gast.emit body)))
-        (new-indent
-          (loop for emission in body-emissions do
-               (format result "~a~a;~%" (indent) emission)))
-        (format result "~a}" (indent))))))
+      (new-indent
+       (loop for emission in (mapcar #'gast.emit body) do
+            (format result "~a~a;~%" (indent) emission)))
+      (format result "~a}" (indent)))))
 
 (defun emit-function (decl)
   (with-slots (name ret-type args body-src body) decl
@@ -181,10 +189,14 @@
               (typespec.to-c-string*
                (make-instance 'typespec-function
                               :ret-type ret-type
-                              :arg-types (mapcar #'decl-var-binding.type args))
+                              :arg-types (mapcar (lambda (x) (decl-variable.type (cdr x)))
+                                                 args))
                name
-               (mapcar #'decl-var-binding.name args)))
+               (mapcar #'car args)))
       (new-indent
+        (loop for (name . vardecl) in args do
+             (when (decl-variable.init vardecl)
+               (format t "~a~a;~%" (indent) (gast.emit (decl-variable.init vardecl)))))
         (loop for elem in body for elem-src in body-src do
              (format t "~a~a;~%" (indent) (gast.emit elem))))
       (format t "}~%"))))

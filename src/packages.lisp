@@ -52,9 +52,9 @@
    :gast
    :ast-funcall :ast-funcall.target :ast-funcall.args
    :decl :decl.name
-   :decl-var-binding :decl-var-binding.name :decl-var-binding.type :decl-var-binding.init
+   ;;:decl-var-binding :decl-var-binding.name :decl-var-binding.type :decl-var-binding.init
    :decl-function :decl-function.ret-type :decl-function.args :decl-function.body-src :decl-function.body
-   :decl-variable :decl-variable.type :decl-variable.storage
+   :decl-variable :decl-variable.type :decl-variable.storage :decl-variable.init
    :ast-var-ref :ast-var-ref.var
    :ast-func-ref :ast-func-ref.func
    :ast-unop :ast-unop.operand :ast-unop.opstr
@@ -65,7 +65,7 @@
    :ast.type :gast.type
    :binop-+ :ast-binop-+ :binop-- :ast-binop-- :ast-binop-= :binop-= :binop-aref :ast-binop-aref
    :member-access-syntax
-   :ast-while
+   :ast-do :ast-while
    :lvalue-p
 
    ;; slots
@@ -76,10 +76,10 @@
   (:export
    :function :array :const :vltl :&
    :fun :struct
-   :defun :defstruct :defunion
-   :while
+   :defun :defstruct :defunion :defvar
+   :do :while
    :char :int16 :int32 :int8 :void
-   :+ :- := :* :/
+   :+ :- := :* :/ :%
    :cast
    :aref
    :$ :$$ :$$$ :$$$$

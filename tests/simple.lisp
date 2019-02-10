@@ -12,4 +12,5 @@
 (defun |main| int32 ((face (& (& (& (struct foo)))))
                      (asdf (const (& int16)))
                      (arr (& int32)))
-  (+ [ face 'hi 4 ] ($ asdf) (blah 2 (aref arr ($ asdf))) (cast int16 4)))
+  (do
+   (+ [ face 'hi 4 ] ($ asdf) (blah 2 (aref arr ($ asdf))) (cast int16 4))))

@@ -12,21 +12,22 @@
 (defclass decl ()
   ((name :type symbol :initarg :name :accessor decl.name)))
 
-(defstruct (decl-var-binding (:conc-name decl-var-binding.))
-  (name nil :type symbol)
-  (type nil :type typespec)
-  (init nil :type (or null gast)))
+;; (defstruct (decl-var-binding (:conc-name decl-var-binding.))
+;;   (name nil :type symbol)
+;;   (type nil :type typespec)
+;;   (init nil :type (or null gast)))
 
 (defclass decl-function (decl)
-  ((ret-type :type typespec                   :initarg :ret-type :accessor decl-function.ret-type)
-   (args     :type (list-of decl-var-binding) :initarg :args     :accessor decl-function.args)
-   (body-src :type list                       :initarg :body-src :accessor decl-function.body-src)
-   (body     :type (list-of gast)             :initarg :body     :accessor decl-function.body)))
+  ((ret-type :type typespec                              :initarg :ret-type :accessor decl-function.ret-type)
+   (args     :type (list-of (pair symbol decl-variable)) :initarg :args     :accessor decl-function.args)
+   (body-src :type list                                  :initarg :body-src :accessor decl-function.body-src)
+   (body     :type (list-of gast)                        :initarg :body     :accessor decl-function.body)))
 
 (defclass decl-variable (decl)
-  ((type     :type typespec :initarg :type    :accessor decl-variable.type)
+  ((type     :type typespec       :initarg :type    :accessor decl-variable.type)
    ;; can be :local or :global
-   (storage  :type symbol   :initarg :storage :accessor decl-variable.storage)))
+   (storage  :type symbol         :initarg :storage :accessor decl-variable.storage)
+   (init     :type (or null gast) :initarg :init :accessor decl-variable.init)))
 
 (defclass ast-funcall (ast)
   ((target :type gast           :initarg :target :accessor ast-funcall.target)
@@ -56,12 +57,15 @@
    "An AST node for structure/union member access"))
  
 (defclass ast-let (ast)
-  ((bindings :type (list-of decl-var-binding) :initarg :bindings :accessor ast-let.bindings)
-   (body     :type (list-of gast)             :initarg :body     :accessor ast-let.body)))
+  ((bindings :type (list-of (pair symbol decl-variable)) :initarg :bindings :accessor ast-let.bindings)
+   (body     :type (list-of gast)                        :initarg :body     :accessor ast-let.body)))
 
 (defclass ast-while (ast)
   ((condition :type gast           :initarg :condition :accessor ast-while.condition)
    (body      :type (list-of gast) :initarg :body      :accessor ast-while.body)))
+
+(defclass ast-do (ast)
+  ((body      :type (list-of gast) :initarg :body      :accessor ast-while.body)))
 
 ;;; ast.type methods
 
@@ -158,6 +162,7 @@
 (define-binary-operator-with-nary-syntax "-"    :left binop--    ast-binop--    ix-hll-kw:-    numeric-binop-type-check numeric-type-result)
 (define-binary-operator-with-nary-syntax "*"    :left binop-*    ast-binop-*    ix-hll-kw:*    numeric-binop-type-check numeric-type-result)
 (define-binary-operator-with-nary-syntax "/"    :left binop-/    ast-binop-/    ix-hll-kw:/    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "%"    :left binop-%    ast-binop-%    ix-hll-kw:%    numeric-binop-type-check numeric-type-result)
 (define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ix-hll-kw:aref aref-type-check          aref-type-result)
 
 (defclass ast-unop-deref (ast-unop)
@@ -319,14 +324,16 @@
                for decl-sym = (gensym "LOCAL") 
             collect
               (list
-               `(make-decl-var-binding :name ',name
-                                       :type (nth ,i ,types%)
-                                       :init (nth ,i ,inits%))
+               `(cons ',name ,decl-sym)
+               ;; `(make-decl-var-binding :name ',name
+               ;;                         :type (nth ,i ,types%)
+               ;;                         :init (nth ,i ,inits%))
                `(,decl-sym
                  (make-instance 'decl-variable
                                 :name ',name
                                 :type (nth ,i ,types%)
-                                :storage :local))
+                                :storage :local
+                                :init (nth ,i ,inits%)))
                `(,name
                  (make-instance 'ast-var-ref
                                 :var ,decl-sym))
@@ -344,13 +351,19 @@
     `(let ((,types% (list ,@(mapcar #'cadr args)))
            (,inits% (list ,@(mapcar #'caddr args))))
        ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% inits%)
-          `(make-instance 'ast-let
-                          :bindings (list ,@bindings)
-                          :body (let ,decl-bindings
-                                  (symbol-macrolet ,macro-bindings
+          `(let ,decl-bindings
+             (make-instance 'ast-let
+                            :bindings (list ,@bindings)
+                            :body (symbol-macrolet ,macro-bindings
                                     (list
-                                     ,@initializers
                                      ,@body))))))))
+
+;;; Simple compound statements
+
+(defmacro ix-hll-kw:do (&body body)
+  `(make-instance 'ast-do :body (list ,@body)))
+
+;;; other stuff
 
 (defmacro ix-hll-kw:while (condition &body body)
   (let ((cond% (gensym)))
@@ -366,15 +379,20 @@
   (let ((func (ast-func-ref.func funcref)))
     (loop for arg in args for param in (decl-function.args func) do
          (when (not (typespec-equalp (remove-cv (gast.type arg))
-                                     (remove-cv (decl-var-binding.type param))))
+                                     (remove-cv (decl-variable.type (cdr param)))))
            (error "Argument incompatible with parameter ~a in call to ~a; expected ~a, got ~a"
-                  (decl-var-binding.name param)
+                  (car param)
                   (decl.name func)
-                  (typespec.to-string (decl-var-binding.type param))
+                  (typespec.to-string (decl-variable.type (cdr param)))
                   (typespec.to-string (gast.type arg))))))
   (make-instance 'ast-funcall
                  :target funcref
                  :args args))
+
+;;; hll global variable definition
+
+(defmacro ix-hll-kw:defvar (name type &optional init)
+  `())
 
 ;;; hll function definition
 
@@ -399,14 +417,14 @@
       (error "Malformed argument list ~a" args))
     `(let ((,types% (list ,@(mapcar #'cadr args))))
        ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% nil)
-          `(make-instance 'decl-function
-                          :name (gensym "FN")
-                          :ret-type ,ret-type
-                          :args (list ,@bindings)
-                          :body-src (list ,@(mapcar (lambda (x) `(quote ,x))
-                                                    body))
-                          :body (let ,decl-bindings
-                                  (symbol-macrolet ,macro-bindings
+          (declare (ignore initializers))
+          `(let ,decl-bindings
+             (make-instance 'decl-function
+                            :name (gensym "FN")
+                            :ret-type ,ret-type
+                            :args (list ,@bindings)
+                            :body-src (list ,@(mapcar (lambda (x) `(quote ,x)) body))
+                            :body (symbol-macrolet ,macro-bindings
                                     (list
                                      ,@body))))))))
 
@@ -433,10 +451,10 @@
          ;; because in the case of recursive functions, we want them to be able
          ;; to grab a reference to themselves before that reference is filled
          ;; out
-        (setf (ast.type ,name)
+         (setf (ast.type ,name)
                (make-instance 'typespec-function
                               :ret-type ,ret-type%
-                              :arg-types (mapcar #'decl-var-binding.type
+                              :arg-types (mapcar (lambda (x) (decl-variable.type (cdr x)))
                                                  (decl-function.args ,fn%))))
          (setf (ast-func-ref.func ,name)
                (car (state.emittables *state*)))))))

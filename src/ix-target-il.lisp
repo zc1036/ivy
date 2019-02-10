@@ -110,14 +110,14 @@ the assignment instructions replaced by PHI instructions to make it SSA.
            (list left-il right-il (ix-il:rget result left-res right-res))))))))
 
 (defmacro with-lexical-scope (bindings &body body)
-  ;;; given BINDINGS :: (list-of decl-var-binding), evaluates BODY in a new
+  ;;; given BINDINGS :: (list-of (pair symbol decl-variable)), evaluates BODY in a new
   ;;; lexical context wherein each binding in BINDINGS is active.
   (with-gensyms (old-scope% new-scope% binding%)
     `(let* ((,old-scope% (state.lex-vars *state*))
             (,new-scope% (make-lexical-scope :next ,old-scope%)))
        (loop for ,binding% in ,bindings do
-            (push (cons (decl-var-binding.name ,binding%)
-                        (ix-il:r (typespec.sizeof (decl-var-binding.type ,binding%)) (decl-var-binding.name ,binding%)))
+            (push (cons (car ,binding%)
+                        (ix-il:r (typespec.sizeof (cdr ,binding%)) (car ,binding%)))
                   (lexical-scope.bindings ,new-scope%)))
        (setf (state.lex-vars *state*) ,new-scope%)
        (unwind-protect
