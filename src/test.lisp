@@ -24,7 +24,7 @@
      (:directory #.(portable-getenv "PWD"))
      :inherit-configuration))
 
-(asdf:oos 'asdf:load-op 'ix)
+(asdf:oos 'asdf:load-op 'ivy)
 
 (defun portable-argv ()
   (or

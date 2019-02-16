@@ -1,11 +1,11 @@
 
-(in-package :ix-target-il)
+(in-package :ivy-target-il)
 
 #|
 
 General workings of the IL target:
 
-The IX-IL package defines classes that describe the IL operators and
+The IVY-IL package defines classes that describe the IL operators and
 operands. The IL is a simple register-based linear language. It is not in SSA
 form yet.
 
@@ -21,14 +21,14 @@ the assignment instructions replaced by PHI instructions to make it SSA.
   "Emits necessary EXT instructions to extend register A to the size of B or
    vice versa, whichever creates a larger register. 
    Returns a list ((areg ainstrs) (breg binstrs))"
-  (let ((regsize (max (ix-il:reg.bytesize a) (ix-il:reg.bytesize b))))
+  (let ((regsize (max (ivy-il:reg.bytesize a) (ivy-il:reg.bytesize b))))
     (list
-     (if (= (ix-il:reg.bytesize a) regsize)
+     (if (= (ivy-il:reg.bytesize a) regsize)
          (list a nil)
-         (ix-il:with-reg newreg regsize (ix-il:ext newreg a)))
-     (if (= (ix-il:reg.bytesize b) regsize)
+         (ivy-il:with-reg newreg regsize (ivy-il:ext newreg a)))
+     (if (= (ivy-il:reg.bytesize b) regsize)
          (list b nil)
-         (ix-il:with-reg newreg regsize (ix-il:ext newreg b))))))
+         (ivy-il:with-reg newreg regsize (ivy-il:ext newreg b))))))
 
 ;; Converts the given gast to IL
 (defgeneric gast.emit (gast)
@@ -43,34 +43,34 @@ the assignment instructions replaced by PHI instructions to make it SSA.
   (list () ()))
 
 (defmethod gast.emit ((a integer))
-  (let* ((imm (ix-il:i a 4))
-         (reg (ix-il:r 4)))
-    (list reg (ix-il:move reg imm))))
+  (let* ((imm (ivy-il:i a 4))
+         (reg (ivy-il:r 4)))
+    (list reg (ivy-il:move reg imm))))
 
 (defmethod gast.emit ((a ast-binop-+))
   (with-slots (left right) a
     (let+ (((left-res left-il)              (gast.emit left))
            ((right-res right-il)            (gast.emit right))
            (((areg ainstrs) (breg binstrs)) (reg-extend left-res right-res)))
-      (ix-il:with-reg resreg areg
-        (list left-il right-il ainstrs binstrs (ix-il:add resreg areg breg))))))
+      (ivy-il:with-reg resreg areg
+        (list left-il right-il ainstrs binstrs (ivy-il:add resreg areg breg))))))
 
 (defmethod gast.emit ((a ast-binop--))
   (with-slots (left right) a
     (let+ (((left-res left-il)              (gast.emit left))
            ((right-res right-il)            (gast.emit right))
            (((areg ainstrs) (breg binstrs)) (reg-extend left-res right-res)))
-      (ix-il:with-reg resreg areg
-        (list left-il right-il ainstrs binstrs (ix-il:sub resreg areg breg))))))
+      (ivy-il:with-reg resreg areg
+        (list left-il right-il ainstrs binstrs (ivy-il:sub resreg areg breg))))))
 
 (defmethod gast.emit ((a ast-binop-=))
   (with-slots (left right) a
-    ;; this is a reiteration of the types supported in ix-ast:lvalue-p
+    ;; this is a reiteration of the types supported in ivy-ast:lvalue-p
     (ematch left
       ((class ast-var-ref)
        (let+ (((left-res left-il)   (gast.emit left))
               ((right-res right-il) (gast.emit right)))
-         (list left-res (list left-il right-il (ix-il:move left-res right-res)))))
+         (list left-res (list left-il right-il (ivy-il:move left-res right-res)))))
       ((class ast-binop-aref (left base) (right offset))
        (let+ (((base-res base-il)     (gast.emit base))
               ((offset-res offset-il) (gast.emit offset))
@@ -80,22 +80,22 @@ the assignment instructions replaced by PHI instructions to make it SSA.
          (list elt-res (list base-il offset-il elt-il
                              (etypecase (gast.type base)
                                (typespec-pointer
-                                (ix-il:pset base-res offset-res elt-res))
+                                (ivy-il:pset base-res offset-res elt-res))
                                (typespec-array
-                                (ix-il:rset base-res offset-res elt-res))))))))))
+                                (ivy-il:rset base-res offset-res elt-res))))))))))
 
 (defmethod gast.emit ((a ast-funcall))
   (with-slots (target args) a
     (let* ((arg-gen (mapcar #'gast.emit args))
            (arg-regs (mapcar #'first arg-gen))
            (arg-instrs (mapcar #'second arg-gen))
-           (result (ix-il:r (typespec.sizeof (gast.type a)))))
+           (result (ivy-il:r (typespec.sizeof (gast.type a)))))
       (list result (list arg-instrs
                          (etypecase target
                            (ast-func-ref
-                            (ix-il:dcall result (decl.name (ast-func-ref.func target)) arg-regs))
+                            (ivy-il:dcall result (decl.name (ast-func-ref.func target)) arg-regs))
                            (t
-                            (ix-il:icall result (decl.name (ast-func-ref.func target)) arg-regs))))))))
+                            (ivy-il:icall result (decl.name (ast-func-ref.func target)) arg-regs))))))))
 
 (defmethod gast.emit ((a ast-binop-aref))
   (with-slots (left right) a
@@ -103,11 +103,11 @@ the assignment instructions replaced by PHI instructions to make it SSA.
            ((right-res right-il) (gast.emit right)))
       (ematch (remove-cv (gast.type left))
         ((class typespec-pointer ref)
-         (ix-il:with-reg result (typespec.sizeof ref)
-           (list left-il right-il (ix-il:pget result left-res right-res))))
+         (ivy-il:with-reg result (typespec.sizeof ref)
+           (list left-il right-il (ivy-il:pget result left-res right-res))))
         ((class typespec-array elt-type)
-         (ix-il:with-reg result (typespec.sizeof elt-type)
-           (list left-il right-il (ix-il:rget result left-res right-res))))))))
+         (ivy-il:with-reg result (typespec.sizeof elt-type)
+           (list left-il right-il (ivy-il:rget result left-res right-res))))))))
 
 (defmacro with-lexical-scope (bindings &body body)
   ;;; given BINDINGS :: (list-of (pair symbol decl-variable)), evaluates BODY in a new
@@ -117,7 +117,7 @@ the assignment instructions replaced by PHI instructions to make it SSA.
             (,new-scope% (make-lexical-scope :next ,old-scope%)))
        (loop for ,binding% in ,bindings do
             (push (cons (car ,binding%)
-                        (ix-il:r (typespec.sizeof (cdr ,binding%)) (car ,binding%)))
+                        (ivy-il:r (typespec.sizeof (cdr ,binding%)) (car ,binding%)))
                   (lexical-scope.bindings ,new-scope%)))
        (setf (state.lex-vars *state*) ,new-scope%)
        (unwind-protect
@@ -128,14 +128,14 @@ the assignment instructions replaced by PHI instructions to make it SSA.
   (with-slots (condition body) a
     (let+ (((cond-res cond-il) (gast.emit condition))
            (body-ils (loop for elem in body collect (second (gast.emit elem))))
-           (skip-body (ix-il:jump-target))
-           (loopback (ix-il:jump-target)))
+           (skip-body (ivy-il:jump-target))
+           (loopback (ivy-il:jump-target)))
       (list nil (list
                  loopback
                  cond-il
-                 (ix-il:jumpc cond-res := (ix-il:i 0) skip-body)
+                 (ivy-il:jumpc cond-res := (ivy-il:i 0) skip-body)
                  body-ils
-                 (ix-il:jump loopback)
+                 (ivy-il:jump loopback)
                  skip-body)))))
 
 (defmethod gast.emit ((a ast-let))
@@ -166,7 +166,7 @@ the assignment instructions replaced by PHI instructions to make it SSA.
 (defun print-instrs (instrs)
   (etypecase instrs
     (list (mapc #'print-instrs instrs))
-    (ix-il:optr (format t "  ~a~%" (ix-il:optr.repr instrs)))))
+    (ivy-il:optr (format t "  ~a~%" (ivy-il:optr.repr instrs)))))
 
 (defun emit (decl)
   (with-slots (ret-type args body-src body) decl

@@ -1,28 +1,28 @@
 
-(defpackage :ix-util
+(defpackage :ivy-util
   (:use :cl)
   (:export :let+ :with-gensyms :list-of :all-of-type))
 
-(defpackage :ix-il
+(defpackage :ivy-il
   (:use :cl)
   (:export :r :i :optr :optr.repr
            :move :ext :add :sub :icall :dcall :pset :rset :pget :rget :jump :jumpc :jump-target
            :reg.name :reg.bytesize :imm.value :imm.bytesize
            :with-reg))
 
-(defpackage :ix-platform
+(defpackage :ivy-platform
   (:use :cl)
   (:export :platform :platform.bits :platform.char-signed-p :platform.name :make-platform))
 
-(defpackage :ix-state
-  (:use :cl :ix-util :ix-platform)
+(defpackage :ivy-state
+  (:use :cl :ivy-util :ivy-platform)
   (:export
    :lexical-scope :make-lexical-scope :lexical-scope.bindings :lexical-scope.next :lexical-scope.lookup
    :state :make-state :state.emittables :state.lex-vars :state.glob-vars :state.lookup-lexical-var
    :*state* :*target-platform*))
 
-(defpackage :ix-type
-  (:use :cl :ix-util :ix-state :ix-platform :optima)
+(defpackage :ivy-type
+  (:use :cl :ivy-util :ivy-state :ivy-platform :optima)
   (:export
    :hltype :hltype.name
    :hltype-agg-member :hltype-agg-member.name :hltype-agg-member.type :agg-lookup-member :make-hltype-agg-member
@@ -45,8 +45,8 @@
    ;; slots
    :name :ret-type :type :members :signed-p :float-p :bytesize :numeric :ref :elt-type :size :arg-types))
 
-(defpackage :ix-ast
-  (:use :cl :ix-util :optima :ix-platform :ix-type :ix-state)
+(defpackage :ivy-ast
+  (:use :cl :ivy-util :optima :ivy-platform :ivy-type :ivy-state)
   (:export
    :ast :ast.type
    :gast
@@ -72,7 +72,7 @@
    :type :name :init :ret-type :args :body-src :body :type :storage :target
    :var :func :left :right :opstr :bindings :condition))
 
-(defpackage :ix-hll-kw
+(defpackage :ivy-hll-kw
   (:export
    :function :array :const :vltl :&
    :fun :struct
@@ -85,17 +85,17 @@
    :$ :$$ :$$$ :$$$$
    :let))
 
-(defpackage :ix-hll
-  (:use :cl :optima :ix-util :ix-platform :ix-ast :ix-type :ix-state)
+(defpackage :ivy-hll
+  (:use :cl :optima :ivy-util :ivy-platform :ivy-ast :ivy-type :ivy-state)
   (:export :main))
 
-(defpackage :ix-hll-user
-  (:use :ix-hll-kw))
+(defpackage :ivy-hll-user
+  (:use :ivy-hll-kw))
 
-(defpackage :ix-target-il
-  (:use :cl :ix-util :ix-ast :ix-state :ix-type :optima)
+(defpackage :ivy-target-il
+  (:use :cl :ivy-util :ivy-ast :ivy-state :ivy-type :optima)
   (:export :emit))
 
-(defpackage :ix-target-c
-  (:use :cl :ix-util :ix-ast :ix-state :ix-type)
+(defpackage :ivy-target-c
+  (:use :cl :ivy-util :ivy-ast :ivy-state :ivy-type)
   (:export :emit))

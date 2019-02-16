@@ -1,5 +1,5 @@
 
-(in-package :ix-util)
+(in-package :ivy-util)
 
 (defun all-of-type (type list)
   (every type list))

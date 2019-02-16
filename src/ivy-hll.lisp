@@ -1,19 +1,19 @@
 
-;;;; ix-hll.lisp
+;;;; ivy-hll.lisp
 
-(in-package :ix-hll)
+(in-package :ivy-hll)
 
 ;;; main program
 
-(defparameter *target* #'ix-target-il:emit)
+(defparameter *target* #'ivy-target-il:emit)
 
 (defun target-string-to-target (target)
   (let ((target (string-upcase target)))
     (cond
       ((string= target "C")
-       (setf *target* #'ix-target-c:emit))
+       (setf *target* #'ivy-target-c:emit))
       ((string= target "IL")
-       (setf *target* #'ix-target-il:emit))
+       (setf *target* #'ivy-target-il:emit))
       (t
        (error "No target by the name of ~a exists" target)))))
 
@@ -36,7 +36,7 @@
          (let ((*state* (make-state)))
            (format t "Compiling ~a~%~%" arg)
 
-           (let ((*package* (find-package 'ix-hll-user)))
+           (let ((*package* (find-package 'ivy-hll-user)))
              (load arg))
 
            (loop for emittable in (reverse (state.emittables *state*)) do

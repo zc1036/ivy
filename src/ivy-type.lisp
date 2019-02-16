@@ -1,5 +1,5 @@
 
-(in-package :ix-type)
+(in-package :ivy-type)
 
 ;; hltypes have referential equality
 
@@ -287,7 +287,7 @@
 
 ;;; hll global names
 
-(defun ix-hll-kw:function (ret-type arg-types)
+(defun ivy-hll-kw:function (ret-type arg-types)
   (check-type ret-type typespec)
 
   (loop for arg-type in arg-types do
@@ -295,23 +295,23 @@
 
   (make-instance 'typespec-function :ret-type ret-type :arg-types arg-types))
 
-(defun ix-hll-kw:array (elt-type &optional size)
+(defun ivy-hll-kw:array (elt-type &optional size)
   (check-type elt-type typespec)
   (check-type size (or null integer))
 
   (make-instance 'typespec-array :elt-type elt-type :size size))
 
-(defun ix-hll-kw:& (ref)
+(defun ivy-hll-kw:& (ref)
   (check-type ref typespec)
 
   (make-instance 'typespec-pointer :ref ref))
 
-(defun ix-hll-kw:const (ref)
+(defun ivy-hll-kw:const (ref)
   (check-type ref typespec)
 
   (make-instance 'typespec-const :ref ref))
 
-(defun ix-hll-kw:vltl (ref)
+(defun ivy-hll-kw:vltl (ref)
   (check-type ref typespec)
 
   (make-instance 'typespec-volatile :ref ref))
@@ -323,7 +323,7 @@
                                   :name :char
                                   :numeric t))
 
-(defvar ix-hll-kw:char (make-instance 'typespec-atom :ref hlts-char))
+(defvar ivy-hll-kw:char (make-instance 'typespec-atom :ref hlts-char))
 
 (defvar hlts-int32 (make-instance 'hltype-builtin
                                   :signed-p t
@@ -332,7 +332,7 @@
                                   :name :int32
                                   :numeric t))
 
-(defvar ix-hll-kw:int32 (make-instance 'typespec-atom :ref hlts-int32))
+(defvar ivy-hll-kw:int32 (make-instance 'typespec-atom :ref hlts-int32))
 
 (defvar hlts-int16 (make-instance 'hltype-builtin
                                   :signed-p t
@@ -341,7 +341,7 @@
                                   :name :int16
                                   :numeric t))
 
-(defvar ix-hll-kw:int16 (make-instance 'typespec-atom :ref hlts-int16))
+(defvar ivy-hll-kw:int16 (make-instance 'typespec-atom :ref hlts-int16))
 
 (defvar hlts-int8 (make-instance 'hltype-builtin
                                   :signed-p t
@@ -350,7 +350,7 @@
                                   :name :int8
                                   :numeric t))
 
-(defvar ix-hll-kw:int8 (make-instance 'typespec-atom :ref hlts-int8))
+(defvar ivy-hll-kw:int8 (make-instance 'typespec-atom :ref hlts-int8))
 
 (defvar hlts-void (make-instance 'hltype-builtin
                                  :signed-p nil
@@ -359,4 +359,4 @@
                                  :name :void
                                  :numeric nil))
 
-(defvar ix-hll-kw:void (make-instance 'typespec-atom :ref hlts-void))
+(defvar ivy-hll-kw:void (make-instance 'typespec-atom :ref hlts-void))

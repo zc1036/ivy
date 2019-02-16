@@ -1,5 +1,5 @@
 
-(in-package :ix-ast)
+(in-package :ivy-ast)
 
 (defclass ast ()
   ((type :type typespec :accessor ast.type)))
@@ -87,9 +87,9 @@
   (ast.type a))
 
 (defmethod gast.type ((a integer))
-  (declare (special ix-hll-kw:int32))
+  (declare (special ivy-hll-kw:int32))
   
-  ix-hll-kw:int32)
+  ivy-hll-kw:int32)
 
 (defun lvalue-p (a)
   (etypecase a
@@ -158,17 +158,17 @@
     ((typespec-pointer ref) ref)
     ((typespec-array elt-type) elt-type)))
 
-(define-binary-operator-with-nary-syntax "+"    :left binop-+    ast-binop-+    ix-hll-kw:+    numeric-binop-type-check numeric-type-result)
-(define-binary-operator-with-nary-syntax "-"    :left binop--    ast-binop--    ix-hll-kw:-    numeric-binop-type-check numeric-type-result)
-(define-binary-operator-with-nary-syntax "*"    :left binop-*    ast-binop-*    ix-hll-kw:*    numeric-binop-type-check numeric-type-result)
-(define-binary-operator-with-nary-syntax "/"    :left binop-/    ast-binop-/    ix-hll-kw:/    numeric-binop-type-check numeric-type-result)
-(define-binary-operator-with-nary-syntax "%"    :left binop-%    ast-binop-%    ix-hll-kw:%    numeric-binop-type-check numeric-type-result)
-(define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ix-hll-kw:aref aref-type-check          aref-type-result)
+(define-binary-operator-with-nary-syntax "+"    :left binop-+    ast-binop-+    ivy-hll-kw:+    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "-"    :left binop--    ast-binop--    ivy-hll-kw:-    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "*"    :left binop-*    ast-binop-*    ivy-hll-kw:*    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "/"    :left binop-/    ast-binop-/    ivy-hll-kw:/    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "%"    :left binop-%    ast-binop-%    ivy-hll-kw:%    numeric-binop-type-check numeric-type-result)
+(define-binary-operator-with-nary-syntax "aref" :left binop-aref ast-binop-aref ivy-hll-kw:aref aref-type-check          aref-type-result)
 
 (defclass ast-unop-deref (ast-unop)
   ((opstr :type string :initform "$" :accessor ast-unop.opstr)))
 
-(defun ix-hll-kw:$ (opnd)
+(defun ivy-hll-kw:$ (opnd)
   (let ((type (remove-cv (gast.type opnd))))
     (ematch type
       ((class typespec-pointer ref)
@@ -178,19 +178,19 @@
       (_
        (error "Object is not a pointer")))))
 
-(defun ix-hll-kw:$$ (opnd)
-  (ix-hll-kw:$ (ix-hll-kw:$ opnd)))
+(defun ivy-hll-kw:$$ (opnd)
+  (ivy-hll-kw:$ (ivy-hll-kw:$ opnd)))
 
-(defun ix-hll-kw:$$$ (opnd)
-  (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ opnd))))
+(defun ivy-hll-kw:$$$ (opnd)
+  (ivy-hll-kw:$ (ivy-hll-kw:$ (ivy-hll-kw:$ opnd))))
 
-(defun ix-hll-kw:$$$$ (opnd)
-  (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ (ix-hll-kw:$ opnd)))))
+(defun ivy-hll-kw:$$$$ (opnd)
+  (ivy-hll-kw:$ (ivy-hll-kw:$ (ivy-hll-kw:$ (ivy-hll-kw:$ opnd)))))
 
 (defclass ast-unop-cast (ast-unop)
   ())
 
-(defun ix-hll-kw:cast (cast-type expr)
+(defun ivy-hll-kw:cast (cast-type expr)
   (let ((expr-type-nocv (remove-cv (gast.type expr)))
         (cast-type-nocv (remove-cv cast-type)))
     (if (or (and (is-numeric cast-type-nocv) (is-numeric expr-type-nocv)) ;; allow arithmetic conversions
@@ -218,7 +218,7 @@
                    :left a
                    :right b)))
 
-(define-nary-syntax-by-binary ix-hll-kw:= binop-= :right)
+(define-nary-syntax-by-binary ivy-hll-kw:= binop-= :right)
 
 (defun mbr (obj member)
   (check-type member symbol)
@@ -246,7 +246,7 @@
          (type-nocv (remove-cv type)))
     (etypecase type-nocv
       (typespec-pointer
-       (deref-mbr (ix-hll-kw:$ obj) member))
+       (deref-mbr (ivy-hll-kw:$ obj) member))
       (t
        (mbr obj member)))))
 
@@ -258,8 +258,8 @@
          `(deref-mbr ,a ,b)))
     (_
      (if rest
-         (apply #'make-member-access-ast (cons `(ix-hll-kw:aref ,a ,b) rest))
-         `(ix-hll-kw:aref ,a ,b)))))
+         (apply #'make-member-access-ast (cons `(ivy-hll-kw:aref ,a ,b) rest))
+         `(ivy-hll-kw:aref ,a ,b)))))
 
 (defun member-access-syntax (stream char)
   "We want things like
@@ -290,7 +290,7 @@
   (loop for mbr in mbrs collect
        `(list ',(car mbr) ,@(cdr mbr))))
 
-(defun ix-hll-kw:struct (s)
+(defun ivy-hll-kw:struct (s)
   (unless (typep s 'hltype-structure)
     (error "~a is not a structure" s))
 
@@ -309,10 +309,10 @@
      (setf (hltype.name ,name) ',name)
      (push ,name (state.emittables *state*))))
 
-(defmacro ix-hll-kw:defstruct (name &body body)
+(defmacro ivy-hll-kw:defstruct (name &body body)
   (define-aggregate-type name 'hltype-structure "structure" "STRUCT" body))
 
-(defmacro ix-hll-kw:defunion (name &body body)
+(defmacro ivy-hll-kw:defunion (name &body body)
   (define-aggregate-type name 'hltype-union "union" "UNION" body))
 
 ;;; LET form
@@ -344,7 +344,7 @@
             (mapcar #'third  bindings-and-inits)
             (mapcar #'fourth bindings-and-inits))))
 
-(defmacro ix-hll-kw:let (args &body body)
+(defmacro ivy-hll-kw:let (args &body body)
   (let ((types% (gensym "TYPES"))
         (inits% (gensym "INITS"))
         (names (mapcar #'car args)))
@@ -360,12 +360,12 @@
 
 ;;; Simple compound statements
 
-(defmacro ix-hll-kw:do (&body body)
+(defmacro ivy-hll-kw:do (&body body)
   `(make-instance 'ast-do :body (list ,@body)))
 
 ;;; other stuff
 
-(defmacro ix-hll-kw:while (condition &body body)
+(defmacro ivy-hll-kw:while (condition &body body)
   (let ((cond% (gensym)))
     `(progn
        (let ((,cond% ,condition))
@@ -391,7 +391,7 @@
 
 ;;; hll global variable definition
 
-(defmacro ix-hll-kw:defvar (name type &optional init)
+(defmacro ivy-hll-kw:defvar (name type &optional init)
   (let ((type% (gensym))))
   `(progn
      (defvar ,name nil)
@@ -418,7 +418,7 @@
                   (error "Malformed function parameter")))))
       t))
 
-(defmacro ix-hll-kw:fun (ret-type args &body body)
+(defmacro ivy-hll-kw:fun (ret-type args &body body)
   (let ((types% (gensym "TYPES"))
         (names (mapcar #'car args)))
     (when (not (check-fun-args args))
@@ -436,7 +436,7 @@
                                     (list
                                      ,@body))))))))
 
-(defmacro ix-hll-kw:defun (name ret-type args &body body)
+(defmacro ivy-hll-kw:defun (name ret-type args &body body)
   (let ((rest% (gensym))
         (fn% (gensym))
         (ret-type% (gensym)))
@@ -452,7 +452,7 @@
          (make-funcall ,name ,rest%))
 
        (let* ((,ret-type% ,ret-type)
-              (,fn% (ix-hll-kw:fun ,ret-type% ,args ,@body)))
+              (,fn% (ivy-hll-kw:fun ,ret-type% ,args ,@body)))
          (setf (decl.name ,fn%) ',name)
          (push ,fn% (state.emittables *state*))
          ;; we do this here rather than moving the setf of ,name down here

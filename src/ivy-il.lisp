@@ -1,7 +1,7 @@
 
-;;;; ix-il.lisp
+;;;; ivy-il.lisp
 
-(in-package :ix-il)
+(in-package :ivy-il)
 
 ;;; operand/operator classes
 
