@@ -392,7 +392,15 @@
 ;;; hll global variable definition
 
 (defmacro ix-hll-kw:defvar (name type &optional init)
-  `())
+  (let ((type% (gensym))))
+  `(progn
+     (defvar ,name nil)
+
+     (when ,name
+       (error "Defining variable ~a: name already defined" ',name))
+
+     (setf ,name (make-instance 'ast-var-ref
+                                ))))
 
 ;;; hll function definition
 
