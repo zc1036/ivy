@@ -43,6 +43,8 @@
                 (etypecase emittable
                   (decl-function
                    (format t "Function ~a:~%" (decl.name emittable)))
+                  (decl-variable
+                   (format t "Variable ~a:~%" (decl.name emittable)))
                   ((or hltype-structure hltype-union)
                    (format t "Aggregate ~a:~%" (hltype.name emittable))))
 

@@ -201,6 +201,10 @@
              (format t "~a~a;~%" (indent) (gast.emit elem))))
       (format t "}~%"))))
 
+(defun emit-variable (decl)
+  (with-slots (name type) decl
+    (format t "static ~a;~%" (typespec.to-c-string* type name))))
+
 (defun emit-aggregate (aggtype agg members)
   (format t "~a~a ~a {~%" (indent) aggtype (hltype.name agg))
   (new-indent
@@ -213,6 +217,8 @@
   (etypecase emittable
     (decl-function
      (emit-function emittable))
+    (decl-variable
+     (emit-variable emittable))
     (hltype-structure
      (emit-aggregate "struct" emittable (hltype-structure.members emittable)))
     (hltype-union

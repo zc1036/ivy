@@ -11,7 +11,7 @@
 
 (defun lexical-scope.lookup (scope var)
   (when scope
-    (let ((binding (assoc var (lexical-scope.bindings scope))))
+    (let ((binding (assoc (string var) (lexical-scope.bindings scope) :test #'string=)))
       (if binding
           (cdr binding)
           (lexical-scope.lookup (lexical-scope.next scope) var)))))

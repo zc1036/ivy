@@ -9,6 +9,8 @@
   (let ((x int32 (+ face2 face 45)))
     (= face x)))
 
+(defvar an-variable int32)
+
 (defun |main| int32 ((face (& (& (& (struct foo)))))
                      (asdf (const (& int16)))
                      (arr (& int32)))

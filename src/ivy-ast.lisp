@@ -10,7 +10,7 @@
   '(or ast integer))
 
 (defclass decl ()
-  ((name :type symbol :initarg :name :accessor decl.name)))
+  ((name :type string :initarg :name :accessor decl.name)))
 
 ;; (defstruct (decl-var-binding (:conc-name decl-var-binding.))
 ;;   (name nil :type symbol)
@@ -27,7 +27,7 @@
   ((type     :type typespec       :initarg :type    :accessor decl-variable.type)
    ;; can be :local or :global
    (storage  :type symbol         :initarg :storage :accessor decl-variable.storage)
-   (init     :type (or null gast) :initarg :init :accessor decl-variable.init)))
+   (init     :type (or null gast) :initarg :init    :accessor decl-variable.init)))
 
 (defclass ast-funcall (ast)
   ((target :type gast           :initarg :target :accessor ast-funcall.target)
@@ -283,7 +283,7 @@
             (error "Invalid structure member name ~a" name))
           (unless (typep type 'typespec)
             (error "Invalid structure member type ~a" type))
-          (make-hltype-agg-member :name name :type type))
+          (make-hltype-agg-member :name (string name) :type type))
          (_ (error "Invalid structure member specification ~a" mbr)))))
 
 (defun make-struct-member-specs (mbrs)
@@ -296,24 +296,23 @@
 
   (make-instance 'typespec-atom :ref s))
 
-(defun define-aggregate-type (name hltype pretty-name gensym-prefix body)
+(defun define-aggregate-type (name hltype pretty-name body)
   `(progn
      (defvar ,name nil)
      (when ,name
        (error "Defining ~a ~a: name already defined" ,pretty-name ',name))
      (setf ,name
            (make-instance ',hltype
-                          :name (gensym ,gensym-prefix)
+                          :name (string ',name)
                           :members (process-struct-members
                                     (list ,@(make-struct-member-specs body)))))
-     (setf (hltype.name ,name) ',name)
      (push ,name (state.emittables *state*))))
 
 (defmacro ivy-hll-kw:defstruct (name &body body)
-  (define-aggregate-type name 'hltype-structure "structure" "STRUCT" body))
+  (define-aggregate-type name 'hltype-structure "structure" body))
 
 (defmacro ivy-hll-kw:defunion (name &body body)
-  (define-aggregate-type name 'hltype-union "union" "UNION" body))
+  (define-aggregate-type name 'hltype-union "union" body))
 
 ;;; LET form
 
@@ -330,7 +329,7 @@
                ;;                         :init (nth ,i ,inits%))
                `(,decl-sym
                  (make-instance 'decl-variable
-                                :name ',name
+                                :name (string ',name)
                                 :type (nth ,i ,types%)
                                 :storage :local
                                 :init (nth ,i ,inits%)))
@@ -351,6 +350,7 @@
     `(let ((,types% (list ,@(mapcar #'cadr args)))
            (,inits% (list ,@(mapcar #'caddr args))))
        ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% inits%)
+          (declare (ignore initializers))
           `(let ,decl-bindings
              (make-instance 'ast-let
                             :bindings (list ,@bindings)
@@ -392,15 +392,25 @@
 ;;; hll global variable definition
 
 (defmacro ivy-hll-kw:defvar (name type &optional init)
-  (let ((type% (gensym))))
-  `(progn
-     (defvar ,name nil)
+  (let ((type% (gensym))
+        (var% (gensym)))
+    `(progn
+       (defvar ,name nil)
 
-     (when ,name
-       (error "Defining variable ~a: name already defined" ',name))
+       (when ,name
+         (error "Defining variable ~a: name already defined" ',name))
 
-     (setf ,name (make-instance 'ast-var-ref
-                                ))))
+       (setf ,name (make-instance 'ast-var-ref))
+
+       (let* ((,type% ,type)
+              (,var% (make-instance 'decl-variable
+                                    :name (string ',name)
+                                    :type ,type%
+                                    :storage :global
+                                    :init ,init)))
+         (setf (ast-var-ref.var ,name) ,var%)
+
+         (push ,var% (state.emittables *state*))))))
 
 ;;; hll function definition
 
@@ -428,7 +438,7 @@
           (declare (ignore initializers))
           `(let ,decl-bindings
              (make-instance 'decl-function
-                            :name (gensym "FN")
+                            :name (string (gensym "FN"))
                             :ret-type ,ret-type
                             :args (list ,@bindings)
                             :body-src (list ,@(mapcar (lambda (x) `(quote ,x)) body))
@@ -453,8 +463,7 @@
 
        (let* ((,ret-type% ,ret-type)
               (,fn% (ivy-hll-kw:fun ,ret-type% ,args ,@body)))
-         (setf (decl.name ,fn%) ',name)
-         (push ,fn% (state.emittables *state*))
+         (setf (decl.name ,fn%) (string ',name))
          ;; we do this here rather than moving the setf of ,name down here
          ;; because in the case of recursive functions, we want them to be able
          ;; to grab a reference to themselves before that reference is filled
@@ -464,5 +473,6 @@
                               :ret-type ,ret-type%
                               :arg-types (mapcar (lambda (x) (decl-variable.type (cdr x)))
                                                  (decl-function.args ,fn%))))
-         (setf (ast-func-ref.func ,name)
-               (car (state.emittables *state*)))))))
+         (setf (ast-func-ref.func ,name) ,fn%)
+
+         (push ,fn% (state.emittables *state*))))))

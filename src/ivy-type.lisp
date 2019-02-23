@@ -4,10 +4,10 @@
 ;; hltypes have referential equality
 
 (defclass hltype ()
-  ((name :type symbol :initarg :name :accessor hltype.name)))
+  ((name :type string :initarg :name :accessor hltype.name)))
 
 (defstruct (hltype-agg-member (:conc-name hltype-agg-member.))
-  (name nil :type symbol)
+  (name nil :type string)
   (type nil :type typespec))
 
 (defclass hltype-structure (hltype)
@@ -22,7 +22,7 @@
 
 (defun agg-lookup-member (members member-name)
   (loop for member in members do
-       (when (eq (hltype-agg-member.name member) member-name)
+       (when (string= (hltype-agg-member.name member) member-name)
          (return member))))
 
 (defclass hltype-builtin (hltype)
@@ -320,7 +320,7 @@
                                   :signed-p (platform.char-signed-p *target-platform*)
                                   :float-p nil
                                   :bytesize 1
-                                  :name :char
+                                  :name "char"
                                   :numeric t))
 
 (defvar ivy-hll-kw:char (make-instance 'typespec-atom :ref hlts-char))
@@ -329,7 +329,7 @@
                                   :signed-p t
                                   :float-p nil
                                   :bytesize 4
-                                  :name :int32
+                                  :name "int32"
                                   :numeric t))
 
 (defvar ivy-hll-kw:int32 (make-instance 'typespec-atom :ref hlts-int32))
@@ -338,7 +338,7 @@
                                   :signed-p t
                                   :float-p nil
                                   :bytesize 2
-                                  :name :int16
+                                  :name "int16"
                                   :numeric t))
 
 (defvar ivy-hll-kw:int16 (make-instance 'typespec-atom :ref hlts-int16))
@@ -347,7 +347,7 @@
                                   :signed-p t
                                   :float-p nil
                                   :bytesize 1
-                                  :name :int8
+                                  :name "int8"
                                   :numeric t))
 
 (defvar ivy-hll-kw:int8 (make-instance 'typespec-atom :ref hlts-int8))
@@ -356,7 +356,7 @@
                                  :signed-p nil
                                  :float-p nil
                                  :bytesize nil
-                                 :name :void
+                                 :name "void"
                                  :numeric nil))
 
 (defvar ivy-hll-kw:void (make-instance 'typespec-atom :ref hlts-void))
