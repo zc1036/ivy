@@ -34,18 +34,10 @@
 
     (loop for arg in sources do
          (let ((*state* (make-state)))
-           (format t "Compiling ~a~%~%" arg)
+           (format t "~%#include \"icy.h\"~%~%")
 
            (let ((*package* (find-package 'ivy-hll-user)))
              (load arg))
 
            (loop for emittable in (reverse (state.emittables *state*)) do
-                (etypecase emittable
-                  (decl-function
-                   (format t "Function ~a:~%" (decl.name emittable)))
-                  (decl-variable
-                   (format t "Variable ~a:~%" (decl.name emittable)))
-                  ((or hltype-structure hltype-union)
-                   (format t "Aggregate ~a:~%" (hltype.name emittable))))
-
                 (funcall *target* emittable))))))

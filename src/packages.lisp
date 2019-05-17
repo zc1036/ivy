@@ -69,7 +69,7 @@
    :lvalue-p
 
    ;; slots
-   :type :name :init :ret-type :args :body-src :body :type :storage :target
+   :type :name :init :ret-type :args :body-src :body :type :storage :target :visibility
    :var :func :left :right :opstr :bindings :condition))
 
 (defpackage :ivy-hll-kw
@@ -83,7 +83,8 @@
    :cast
    :aref
    :$ :$$ :$$$ :$$$$
-   :let))
+   :let
+   :extern))
 
 (defpackage :ivy-hll
   (:use :cl :optima :ivy-util :ivy-platform :ivy-ast :ivy-type :ivy-state)

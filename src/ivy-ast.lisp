@@ -10,12 +10,10 @@
   '(or ast integer))
 
 (defclass decl ()
-  ((name :type string :initarg :name :accessor decl.name)))
+  ((name       :type string :initarg :name       :accessor decl.name)
 
-;; (defstruct (decl-var-binding (:conc-name decl-var-binding.))
-;;   (name nil :type symbol)
-;;   (type nil :type typespec)
-;;   (init nil :type (or null gast)))
+   ;; possible values are :internal and :external
+   (visibility :type symbol :initarg :visibility :accessor decl.visibility)))
 
 (defclass decl-function (decl)
   ((ret-type :type typespec                              :initarg :ret-type :accessor decl-function.ret-type)
@@ -204,10 +202,16 @@
 (defclass ast-binop-= (ast-binop)
   ((opstr :initform "=")))
 
+(defun implicitly-convertible-p (a-type b-type)
+  (check-type a-type typespec)
+  (check-type a-type typespec)
+
+  (typespec-equalp (remove-cv a-type) (remove-cv b-type)))
+
 (defun binop-= (a b)
   (let ((a-type (gast.type a))
         (b-type (gast.type b)))
-    (unless (typespec-equalp (remove-cv a-type) (remove-cv b-type))
+    (unless (implicitly-convertible-p (remove-cv a-type) (remove-cv b-type))
       (error "Assigning an expression of one type to an lvalue of another type"))
     (unless (lvalue-p a)
       (error "Assigning to a non-lvalue"))
@@ -256,6 +260,10 @@
      (if rest
          (apply #'make-member-access-ast (cons `(deref-mbr ,a ,b) rest))
          `(deref-mbr ,a ,b)))
+    (nil
+     (if rest
+         (error "b is nil")
+         `(ivy-hll-kw:$ ,a)))
     (_
      (if rest
          (apply #'make-member-access-ast (cons `(ivy-hll-kw:aref ,a ,b) rest))
@@ -263,6 +271,7 @@
 
 (defun member-access-syntax (stream char)
   "We want things like
+    [ptr]
     [array 1]
     [array idx]
     [struct'mbr]
@@ -324,9 +333,6 @@
             collect
               (list
                `(cons ',name ,decl-sym)
-               ;; `(make-decl-var-binding :name ',name
-               ;;                         :type (nth ,i ,types%)
-               ;;                         :init (nth ,i ,inits%))
                `(,decl-sym
                  (make-instance 'decl-variable
                                 :name (string ',name)
@@ -337,7 +343,11 @@
                  (make-instance 'ast-var-ref
                                 :var ,decl-sym))
                `(when (nth ,i ,inits%)
-                  (binop-= ,name (nth ,i ,inits%)))))))
+                  (unless (implicitly-convertible-p (nth ,i ,types%) (gast.type (nth ,i ,inits%)))
+                    (error "Expression ~a of type ~a in initializer not convertible to type ~a"
+                           (nth ,i ,inits%)
+                           (typespec.to-string (gast.type (nth ,i ,inits%)))
+                           (typespec.to-string (nth ,i ,types%)))))))))
     (values (mapcar #'first  bindings-and-inits)
             (mapcar #'second bindings-and-inits)
             (mapcar #'third  bindings-and-inits)
@@ -349,14 +359,15 @@
         (names (mapcar #'car args)))
     `(let ((,types% (list ,@(mapcar #'cadr args)))
            (,inits% (list ,@(mapcar #'caddr args))))
-       ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% inits%)
-          (declare (ignore initializers))
-          `(let ,decl-bindings
-             (make-instance 'ast-let
-                            :bindings (list ,@bindings)
-                            :body (symbol-macrolet ,macro-bindings
-                                    (list
-                                     ,@body))))))))
+       ,(multiple-value-bind (bindings decl-bindings macro-bindings init-type-checks) (make-let-bindings names types% inits%)
+          `(progn
+             ,@init-type-checks
+             (let ,decl-bindings
+               (make-instance 'ast-let
+                              :bindings (list ,@bindings)
+                              :body (symbol-macrolet ,macro-bindings
+                                      (list
+                                       ,@body)))))))))
 
 ;;; Simple compound statements
 
@@ -434,22 +445,34 @@
     (when (not (check-fun-args args))
       (error "Malformed argument list ~a" args))
     `(let ((,types% (list ,@(mapcar #'cadr args))))
-       ,(multiple-value-bind (bindings decl-bindings macro-bindings initializers) (make-let-bindings names types% nil)
-          (declare (ignore initializers))
-          `(let ,decl-bindings
-             (make-instance 'decl-function
-                            :name (string (gensym "FN"))
-                            :ret-type ,ret-type
-                            :args (list ,@bindings)
-                            :body-src (list ,@(mapcar (lambda (x) `(quote ,x)) body))
-                            :body (symbol-macrolet ,macro-bindings
-                                    (list
-                                     ,@body))))))))
+       ,(multiple-value-bind (bindings decl-bindings macro-bindings init-type-checks) (make-let-bindings names types% nil)
+          `(progn
+             ,@init-type-checks
+             (let ,decl-bindings
+               (make-instance 'decl-function
+                              :visibility :internal
+                              :name (string (gensym "FN"))
+                              :ret-type ,ret-type
+                              :args (list ,@bindings)
+                              :body-src (list ,@(mapcar (lambda (x) `(quote ,x)) body))
+                              :body (symbol-macrolet ,macro-bindings
+                                      (list
+                                       ,@body)))))))))
 
-(defmacro ivy-hll-kw:defun (name ret-type args &body body)
+(defmacro ivy-hll-kw:defun (name-spec ret-type args &body body)
   (let ((rest% (gensym))
         (fn% (gensym))
-        (ret-type% (gensym)))
+        (ret-type% (gensym))
+        (visibility :internal)
+        (name name-spec))
+    (ematch name-spec
+      ((list 'ivy-hll-kw:extern sym-name)
+       (setf name sym-name)
+       (setf visibility :external))
+      ((symbol)
+       t)
+      (_ (error "Invalid name in definiton of ~a" name-spec)))
+    
     `(progn
        (defvar ,name nil)
 
@@ -464,6 +487,7 @@
        (let* ((,ret-type% ,ret-type)
               (,fn% (ivy-hll-kw:fun ,ret-type% ,args ,@body)))
          (setf (decl.name ,fn%) (string ',name))
+         (setf (decl.visibility ,fn%) ,visibility)
          ;; we do this here rather than moving the setf of ,name down here
          ;; because in the case of recursive functions, we want them to be able
          ;; to grab a reference to themselves before that reference is filled

@@ -1,4 +1,5 @@
 
+
 (defstruct foo
   (hi (& int16)))
 

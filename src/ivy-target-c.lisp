@@ -149,19 +149,18 @@
   (with-output-to-string (result)
     (with-slots (bindings body) a
       (with-lexical-scope bindings
-        (let ((body-emissions (mapcar #'gast.emit body)))
-          (format result "{~%")
-          (new-indent
-            (loop for (name . vardecl) in bindings do
-                 (with-slots (type init) vardecl
-                   (format result "~a~a~a~a;~%"
-                           (indent)
-                           (typespec.to-c-string type (symbol-name name))
-                           (if init " = " "")
-                           (if init (gast.emit init) ""))))
-            (loop for emission in body-emissions do
-                 (format result "~a~a;~%" (indent) emission)))
-          (format result "~a}" (indent)))))
+        (format result "{~%")
+        (new-indent
+         (loop for (name . vardecl) in bindings do
+              (with-slots (type init) vardecl
+                (format result "~a~a~a~a;~%"
+                        (indent)
+                        (typespec.to-c-string type (symbol-name name))
+                        (if init " = " "")
+                        (if init (gast.emit init) ""))))
+         (loop for emission in (new-indent (mapcar #'gast.emit body)) do
+              (format result "~a~a;~%" (indent) emission)))
+        (format result "~a}" (indent))))
     result))
 
 (defmethod gast.emit ((a ast-do))
@@ -183,9 +182,12 @@
       (format result "~a}" (indent)))))
 
 (defun emit-function (decl)
-  (with-slots (name ret-type args body-src body) decl
+  (with-slots (name visibility ret-type args body-src body) decl
     (with-lexical-scope args
-      (format t "static ~a {~%"
+      (format t "~a~a {~%"
+              (ecase visibility
+                (:internal "static ")
+                (:external ""))
               (typespec.to-c-string*
                (make-instance 'typespec-function
                               :ret-type ret-type

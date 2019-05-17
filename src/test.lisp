@@ -19,13 +19,6 @@
      default))
 
 
-(asdf:initialize-source-registry
-  '(:source-registry
-     (:directory #.(portable-getenv "PWD"))
-     :inherit-configuration))
-
-(asdf:oos 'asdf:load-op 'ivy)
-
 (defun portable-argv ()
   (or
    #+clisp (ext:argv)
@@ -38,3 +31,19 @@
    #+allegro (sys:command-line-arguments)
    #+lispworks sys:*line-arguments-list*
    (error "Common Lisp implementation not supported")))
+
+;;; The following lines added by ql:add-to-init-file:
+#-quicklisp
+(let ((quicklisp-init (merge-pathnames "quicklisp/setup.lisp"
+                                       (user-homedir-pathname))))
+  (when (probe-file quicklisp-init)
+    (load quicklisp-init)))
+
+(asdf:initialize-source-registry
+ `(:source-registry
+    (:directory ,(cadr (portable-argv)))
+     :inherit-configuration))
+
+(asdf:oos 'asdf:load-op 'ivy)
+
+(ivy-hll:main (cdr (portable-argv)))

@@ -255,30 +255,6 @@
     ((list (class typespec) (class typespec))
      nil)))
 
-;;(defgeneric typespec-equalp (a b))
-;;
-;;(defmethod typespec-equalp ((a typespec-const) (b typespec-const))
-;;  (typespec-equalp (typespec-const.ref a) (typespec-const.ref b)))
-;;
-;;(defmethod typespec-equalp ((a typespec-volatile) (b typespec-volatile))
-;;  (typespec-equalp (typespec-volatile.ref a) (typespec-volatile.ref b)))
-;;
-;;(defmethod typespec-equalp ((a typespec-pointer) (b typespec-pointer))
-;;  (typespec-equalp (typespec-pointer.ref a) (typespec-pointer.ref b)))
-;;
-;;(defmethod typespec-equalp ((a typespec-function) (b typespec-function))
-;;  (with-slots ((a-ret ret-type) (a-args arg-types)) a
-;;    (with-slots ((b-ret ret-type) (b-args arg-types)) b
-;;      (and (typespec-equalp a-ret b-ret)
-;;           (= (length a-args) (length b-args))
-;;           (every #'typespec-equalp a-args b-args)))))
-;;
-;;(defmethod typespec-equalp ((a typespec-atom) (b typespec-atom))
-;;  (eq (typespec-atom.ref a) (typespec-atom.ref b)))
-;;
-;;(defmethod typespec-equalp (a b)
-;;  nil)
-
 (defun const-p (a)
   (match a
     ((class typespec-volatile ref) (const-p ref))
