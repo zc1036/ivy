@@ -158,7 +158,7 @@
                         (typespec.to-c-string type (symbol-name name))
                         (if init " = " "")
                         (if init (gast.emit init) ""))))
-         (loop for emission in (new-indent (mapcar #'gast.emit body)) do
+         (loop for emission in (mapcar #'gast.emit body) do
               (format result "~a~a;~%" (indent) emission)))
         (format result "~a}" (indent))))
     result))

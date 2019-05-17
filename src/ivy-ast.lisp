@@ -193,6 +193,8 @@
         (cast-type-nocv (remove-cv cast-type)))
     (if (or (and (is-numeric cast-type-nocv) (is-numeric expr-type-nocv)) ;; allow arithmetic conversions
             (and (typep expr-type-nocv 'typespec-pointer)                 ;; allow pointer conversions
+                 (typep cast-type-nocv 'typespec-pointer))
+            (and (is-numeric expr-type-nocv)                              ;; allow int -> pointer casts
                  (typep cast-type-nocv 'typespec-pointer)))
         (make-instance 'ast-unop-cast :operand expr :type cast-type)
         (error "Cannot cast from ~a to ~a"
