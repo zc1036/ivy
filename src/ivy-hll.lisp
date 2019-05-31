@@ -5,8 +5,6 @@
 
 ;;; main program
 
-(defparameter *target* #'ivy-target-il:emit)
-
 (defun target-string-to-target (target)
   (let ((target (string-upcase target)))
     (cond
@@ -17,27 +15,15 @@
       (t
        (error "No target by the name of ~a exists" target)))))
 
-(defun main (argv)
-  (let ((sources nil))
-    (pop argv)
-    (loop while argv do
-      (let ((arg (car argv)))
-        (cond
-          ((string= arg "--target")
-           (pop argv)
-           (setf *target* (target-string-to-target (car argv))))
-          (t
-           (push arg sources))))
-      (pop argv))
+(defun compile-file (file target)
+  (set-macro-character #\[ #'member-access-syntax t)
 
-    (set-macro-character #\[ #'member-access-syntax t)
+  (let ((*state* (make-state))
+        (emitter (target-string-to-target target)))
+    (format t "~%#include \"icy.h\"~%~%")
 
-    (loop for arg in sources do
-         (let ((*state* (make-state)))
-           (format t "~%#include \"icy.h\"~%~%")
+    (let ((*package* (find-package 'ivy-hll-user)))
+      (load file))
 
-           (let ((*package* (find-package 'ivy-hll-user)))
-             (load arg))
-
-           (loop for emittable in (reverse (state.emittables *state*)) do
-                (funcall *target* emittable))))))
+    (loop for emittable in (reverse (state.emittables *state*)) do
+         (funcall emitter emittable))))

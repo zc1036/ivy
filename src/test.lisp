@@ -46,4 +46,23 @@
 
 (asdf:oos 'asdf:load-op 'ivy)
 
-(ivy-hll:main (cdr (portable-argv)))
+(defun main (argv)
+  (let ((sources nil)
+        (target-name "C"))
+    (pop argv)
+    (loop while argv do
+         (let ((arg (car argv)))
+           (cond
+             ((string= arg "--target")
+              (pop argv)
+              (setf target-name (car argv)))
+             (t
+              (push arg sources))))
+         (pop argv))
+
+    (when (> (length sources) 1)
+      (error "Cannot compile more than one source file per program invocation"))
+
+    (ivy-hll:compile-file (car sources) target-name)))
+
+(main (cdr (portable-argv)))

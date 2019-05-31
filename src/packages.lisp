@@ -88,7 +88,8 @@
 
 (defpackage :ivy-hll
   (:use :cl :optima :ivy-util :ivy-platform :ivy-ast :ivy-type :ivy-state)
-  (:export :main))
+  (:shadow :compile-file)
+  (:export :compile-file))
 
 (defpackage :ivy-hll-user
   (:use :ivy-hll-kw))
