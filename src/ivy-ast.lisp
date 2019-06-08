@@ -461,20 +461,13 @@
                                       (list
                                        ,@body)))))))))
 
-(defmacro ivy-hll-kw:defun (name-spec ret-type args &body body)
+(defmacro ivy-hll-kw:export (name)
+  `(setf (decl.visibility (ast-func-ref.func ,name)) :external))
+
+(defmacro ivy-hll-kw:defun (name ret-type args &body body)
   (let ((rest% (gensym))
         (fn% (gensym))
-        (ret-type% (gensym))
-        (visibility :internal)
-        (name name-spec))
-    (ematch name-spec
-      ((list 'ivy-hll-kw:extern sym-name)
-       (setf name sym-name)
-       (setf visibility :external))
-      ((symbol)
-       t)
-      (_ (error "Invalid name in definiton of ~a" name-spec)))
-    
+        (ret-type% (gensym)))
     `(progn
        (defvar ,name nil)
 
@@ -489,7 +482,7 @@
        (let* ((,ret-type% ,ret-type)
               (,fn% (ivy-hll-kw:fun ,ret-type% ,args ,@body)))
          (setf (decl.name ,fn%) (string ',name))
-         (setf (decl.visibility ,fn%) ,visibility)
+         (setf (decl.visibility ,fn%) :internal)
          ;; we do this here rather than moving the setf of ,name down here
          ;; because in the case of recursive functions, we want them to be able
          ;; to grab a reference to themselves before that reference is filled

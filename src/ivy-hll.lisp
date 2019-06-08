@@ -9,9 +9,9 @@
   (let ((target (string-upcase target)))
     (cond
       ((string= target "C")
-       (setf *target* #'ivy-target-c:emit))
+       #'ivy-target-c:emit)
       ((string= target "IL")
-       (setf *target* #'ivy-target-il:emit))
+       #'ivy-target-il:emit)
       (t
        (error "No target by the name of ~a exists" target)))))
 

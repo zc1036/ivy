@@ -84,15 +84,19 @@
    :aref
    :$ :$$ :$$$ :$$$$
    :let
-   :extern))
+   :export))
 
 (defpackage :ivy-hll
   (:use :cl :optima :ivy-util :ivy-platform :ivy-ast :ivy-type :ivy-state)
   (:shadow :compile-file)
   (:export :compile-file))
 
+(defpackage :ivy-core
+  (:use :cl)
+  (:export :include))
+
 (defpackage :ivy-hll-user
-  (:use :ivy-hll-kw))
+  (:use :ivy-hll-kw :ivy-core))
 
 (defpackage :ivy-target-il
   (:use :cl :ivy-util :ivy-ast :ivy-state :ivy-type :optima)

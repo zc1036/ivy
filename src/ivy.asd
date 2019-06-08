@@ -22,4 +22,5 @@
                (:file "ivy-ast")
                (:file "ivy-target-il")
                (:file "ivy-target-c")
-               (:file "ivy-hll")))
+               (:file "ivy-hll")
+               (:file "ivy-core")))

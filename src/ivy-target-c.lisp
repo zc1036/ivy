@@ -91,12 +91,13 @@
            (error "Lexical variable ~a isn't mapped somehow, this is probably a bug ~a"
                   (decl.name var)
                   (lexical-scope.bindings (state.lex-vars *state*))))
-         (format nil "~a" (decl.name var))))
+         
+         (decl.name var)))
       (:global
-       (let ((glob-var-pair (assoc var (state.glob-vars *state*))))
+       (let ((glob-var-pair (assoc (decl.name var) (state.glob-vars *state*))))
          (unless glob-var-pair
            (error "Global variable ~a isn't mapped somehow, this is probably a bug" (decl.name var)))
-         (list (cdr glob-var-pair) ()))))))
+         (decl.name var))))))
 
 (defmethod gast.emit ((a ast-binop-aref))
   (with-slots (left right) a
@@ -204,8 +205,16 @@
       (format t "}~%"))))
 
 (defun emit-variable (decl)
-  (with-slots (name type) decl
-    (format t "static ~a;~%" (typespec.to-c-string* type name))))
+  (with-slots (name type init) decl
+    (push (cons name type) (state.glob-vars *state*))
+    (format t "static ~a~a~a;~%"
+            (typespec.to-c-string* type name)
+            (if init
+                " = "
+                "")
+            (if init
+                (gast.emit init)
+                ""))))
 
 (defun emit-aggregate (aggtype agg members)
   (format t "~a~a ~a {~%" (indent) aggtype (hltype.name agg))
