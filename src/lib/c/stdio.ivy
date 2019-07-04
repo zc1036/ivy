@@ -1,0 +1,6 @@
+
+(module stdio
+
+(declare-ffi puts ((str (& char))))
+
+) ;; module stdio
