@@ -22,24 +22,29 @@
  expansion. A template expander has the signature
    template-arguments template-body -> macroexpanded-definition")
 
-(defmacro template (template-arguments &body body)
-"Replaces one or more declarations (TEMPLATE-DEFINER ...) with the output of the
- appropriate expander function for each TEMPLATE-DEFINER (from *TEMPLATE-EXPANDERS*)"
+(defmacro template (template-arguments form)
+  "Replaces one or more declarations (TEMPLATE-DEFINER ...) with the output of the
+  appropriate expander function for each TEMPLATE-DEFINER (from *TEMPLATE-EXPANDERS*)"
 
-  (loop for templated-declaration in body collect
-       (progn
-         (format t "~a~%" templated-declaration)
-         (ematch templated-declaration
-           ((cons (and sym (symbol)) rest)
-            (let ((expander (assoc sym *template-expanders*)))
-              (funcall (cdr expander) template-arguments rest)))))))
+  (ematch form
+    ((cons (and sym (symbol)) rest)
+     (let ((expander (assoc sym *template-expanders*)))
+       (apply (cdr expander) (list template-arguments) rest)))))
 
 (defmacro define-template-expander (template-expander-name arguments &body body)
   `(push (cons ',template-expander-name (lambda ,arguments ,@body))))
 
-(define-template-expander defun (template))
+(defun deduce-template-arguments)
+
+(define-template-expander defun (template-arguments func-name func-args ret-type &body body)
+  `(progn
+     (let ,(deduce-template-arguments template-arguments func-args)
+       (defun ,func-name ,func-args ,ret-type ,@body))
+     (defun ,(make-template-specializer-name func-name) (&rest args)
+       "Do something here")))
 
 (defun-template *name* *template-lambda-list* *function-lambda-list* *return-type* *body*)
 
-(defun-template hello ((A typename) (B int)) (A foo) int
-  (return B))
+(template (A)
+ (defun hello ((b A)) A
+   (return b)))
