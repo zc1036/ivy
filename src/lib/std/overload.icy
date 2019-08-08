@@ -1,0 +1,46 @@
+
+(in-package :std.overload)
+
+(defun concat (list)
+  (apply #'concatenate (cons 'string list)))
+
+(defun typespec.to-string (x) (format nil "~a" x))
+
+(defun gast.type (x) (list 'type-of x))
+
+(defmacro my-defun (name args ret-type &body body)
+  (let ((arg-types% (gensym))
+        (types-str% (gensym))
+        (new-name% (gensym))
+        (dispatcher-sentinel-name (intern (concatenate 'string
+                                                       "--overload_sentinel--"
+                                                       (symbol-name name))))
+        (rest% (gensym)))
+    `(let* ((,arg-types% (list ,@(mapcar #'cadr args)))
+            (,types-str% (concat (mapcar #'typespec.to-string ,arg-types%)))
+            (,new-name% (intern (concatenate 'string ,(symbol-name name) "__overload__"
+                                             ,types-str%))))
+       ;; Fix: since we've already evaluated ARG-TYPES, we should call the
+       ;; imperative function to define the overload rather than using
+       ;; DEFUN declaratively.
+       (format t "~a~%" (list 'old-defun ,new-name% ',ret-type ',args '(list ,@body)))
+
+       (defvar ,dispatcher-sentinel-name nil)
+
+       (locally
+           (declare (special ,dispatcher-sentinel-name))
+
+         ;; If we've defined the dispatcher before, don't define it again
+         (when (not ,dispatcher-sentinel-name)
+
+           (defmacro ,name (&rest ,rest%)
+             (let ((types%% (gensym))
+                   (args%% (gensym)))
+               `(let* ((,args%% (list ,@,rest%))
+                       (,types%% (mapcar #'gast.type ,args%%)))
+                ;;; resume
+                  (list ,args%% ,types%%))))
+
+           ;; set the variable so that we won't keep redefining the
+           ;; dispatcher func for every overload definition
+           (setf ,dispatcher-sentinel-name t))))))
