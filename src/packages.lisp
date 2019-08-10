@@ -74,9 +74,10 @@
 
 (defpackage :ivy-hll-kw
   (:export
+   :include
    :function :array :const :vltl :&
    :fun :struct
-   :defun :defstruct :defunion :defvar
+   :defun :defun2 :defstruct :defunion :defvar
    :do :while
    :char :int16 :int32 :int8 :void
    :+ :- := :* :/ :%
@@ -92,8 +93,7 @@
   (:export :compile-file))
 
 (defpackage :ivy-core
-  (:use :cl)
-  (:export :include))
+  (:use :cl))
 
 (defpackage :ivy-hll-user
   (:use :ivy-hll-kw :ivy-core))
