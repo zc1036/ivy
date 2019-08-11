@@ -18,7 +18,6 @@
 (defclass decl-function (decl)
   ((ret-type :type typespec                              :initarg :ret-type :accessor decl-function.ret-type)
    (args     :type (list-of (pair symbol decl-variable)) :initarg :args     :accessor decl-function.args)
-   (body-src :type list                                  :initarg :body-src :accessor decl-function.body-src)
    (body     :type (list-of gast)                        :initarg :body     :accessor decl-function.body)))
 
 (defclass decl-variable (decl)
@@ -447,19 +446,27 @@
     (when (not (check-fun-args args))
       (error "Malformed argument list ~a" args))
     `(let ((,types% (list ,@(mapcar #'cadr args))))
-       ,(multiple-value-bind (bindings decl-bindings macro-bindings init-type-checks) (make-let-bindings names types% nil)
+       ,(multiple-value-bind (bindings decl-bindings macro-bindings init-type-checks)
+            (make-let-bindings names types% nil)
           `(progn
              ,@init-type-checks
              (let ,decl-bindings
-               (make-instance 'decl-function
-                              :visibility :internal
-                              :name (string (gensym "FN"))
-                              :ret-type ,ret-type
-                              :args (list ,@bindings)
-                              :body-src (list ,@(mapcar (lambda (x) `(quote ,x)) body))
-                              :body (symbol-macrolet ,macro-bindings
-                                      (list
-                                       ,@body)))))))))
+               (list
+                (make-instance 'decl-function
+                               :visibility :internal
+                               :name (string (gensym "FN"))
+                               :ret-type ,ret-type
+                               :args (list ,@bindings)
+                               :body :unevaluated)
+                (symbol-macrolet ,macro-bindings
+                  ;; This body is wrapped in a lambda
+                  ;; because we only want to evaluate it
+                  ;; after we set the global name has been
+                  ;; bound to this decl-function instance,
+                  ;; to support recursive calls.
+                  (lambda ()
+                    (list
+                     ,@body))))))))))
 
 (defmacro ivy-hll-kw:export (name)
   `(setf (decl.visibility (ast-func-ref.func ,name)) :external))
@@ -467,7 +474,8 @@
 (defmacro ivy-hll-kw:defun (name ret-type args &body body)
   (let ((rest% (gensym))
         (fn% (gensym))
-        (ret-type% (gensym)))
+        (ret-type% (gensym))
+        (body-lambda% (gensym)))
     `(progn
        (defvar ,name nil)
 
@@ -479,8 +487,8 @@
        (defun ,name (&rest ,rest%)
          (make-funcall ,name ,rest%))
 
-       (let* ((,ret-type% ,ret-type)
-              (,fn% (ivy-hll-kw:fun ,ret-type% ,args ,@body)))
+       (let+ ((,ret-type% ,ret-type)
+              ((,fn% ,body-lambda%) (ivy-hll-kw:fun ,ret-type% ,args ,@body)))
          (setf (decl.name ,fn%) (string ',name))
          (setf (decl.visibility ,fn%) :internal)
          ;; we do this here rather than moving the setf of ,name down here
@@ -493,5 +501,10 @@
                               :arg-types (mapcar (lambda (x) (decl-variable.type (cdr x)))
                                                  (decl-function.args ,fn%))))
          (setf (ast-func-ref.func ,name) ,fn%)
+
+         ;; This is postponed to way down here because we want as much of the
+         ;; data about the function to be in place in the global variables, to
+         ;; support recursive calls.
+         (setf (decl-function.body ,fn%) (funcall ,body-lambda%))
 
          (push ,fn% (state.emittables *state*))))))

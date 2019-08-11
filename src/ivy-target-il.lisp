@@ -169,9 +169,9 @@ the assignment instructions replaced by PHI instructions to make it SSA.
     (ivy-il:optr (format t "  ~a~%" (ivy-il:optr.repr instrs)))))
 
 (defun emit (decl)
-  (with-slots (ret-type args body-src body) decl
+  (with-slots (ret-type args body) decl
     (with-lexical-scope args
-      (loop for elem in body for elem-src in body-src do
+      (loop for elem in body do
            (let+ (((result ops) (gast.emit elem)))
              result
              (with-input-from-string (in (format nil "~a" elem-src))

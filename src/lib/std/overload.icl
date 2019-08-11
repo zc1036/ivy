@@ -46,7 +46,8 @@
                            (mapcar #'typespec.to-string ,types%%)))))))
 
        (ivy-hll-kw:defun ,overload-name ,ret-type ,args
-         ,@body)
-
-       (setf (gethash ,types-str% ,overload-table-name)
-             #',overload-name))))
+         ;; FIX: make DEFUN define the function earlier so recursive calls work
+         (progn (setf (gethash ,types-str% ,overload-table-name)
+                      #',overload-name)
+                nil)
+         ,@body))))

@@ -183,7 +183,7 @@
       (format result "~a}" (indent)))))
 
 (defun emit-function (decl)
-  (with-slots (name visibility ret-type args body-src body) decl
+  (with-slots (name visibility ret-type args body) decl
     (with-lexical-scope args
       (format t "~a~a {~%"
               (ecase visibility
@@ -200,7 +200,7 @@
         (loop for (name . vardecl) in args do
              (when (decl-variable.init vardecl)
                (format t "~a~a;~%" (indent) (gast.emit (decl-variable.init vardecl)))))
-        (loop for elem in body for elem-src in body-src do
+        (loop for elem in body do
              (format t "~a~a;~%" (indent) (gast.emit elem))))
       (format t "}~%"))))
 

@@ -12,7 +12,11 @@
     (= face x)))
 
 (defun2 blah int16 ((face int16) (face2 int32))
-  (cast int16 2))
+        (blah face face2)
+        )
+
+(defun asdfasdf int32 ()
+       (asdfasdf))
 
 (defvar an-variable int32)
 
